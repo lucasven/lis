@@ -20,7 +20,7 @@ namespace Lis.Agent;
 
 public sealed class ConversationService(
 	IServiceScopeFactory         scopeFactory,
-	IChannelClient               channelClient,
+	IChannelClientProvider       channelProvider,
 	Kernel                       kernel,
 	ToolRunner                   toolRunner,
 	ContextWindowBuilder         contextWindowBuilder,
@@ -96,8 +96,9 @@ public sealed class ConversationService(
 		if (message.MediaType is not null)
 			await this.ProcessMediaAsync(db, message, ct);
 
+		IChannelClient channel = channelProvider.Get(message.Channel);
 		try {
-			await channelClient.MarkReadAsync(message.ExternalId, message.ChatId, ct);
+			await channel.MarkReadAsync(message.ExternalId, message.ChatId, ct);
 		} catch (Exception ex) {
 			logger.LogWarning(ex, "Failed to mark message as read");
 		}
@@ -130,11 +131,13 @@ public sealed class ConversationService(
 		ModelSettings  agentModelSettings = AgentService.ToModelSettings(agent);
 		SessionEntity  session            = chat.CurrentSession!;
 
+		IChannelClient channel = channelProvider.Get(message.Channel);
+
 		// Handle commands before AI processing
 		if (commandRouter.Match(message.Body) is { } match) {
 			if (match.Command.OwnerOnly && message.SenderId != lisOptions.Value.OwnerJid) {
 				string denied = "⛔ This command requires owner authorization.";
-				await channelClient.SendMessageAsync(message.ChatId, denied, message.ExternalId, ct);
+				await channel.SendMessageAsync(message.ChatId, denied, message.ExternalId, ct);
 
 				db.Messages.Add(new MessageEntity {
 					ChatId    = chat.Id,
@@ -152,7 +155,7 @@ public sealed class ConversationService(
 
 			CommandContext ctx = new(message, chat, session, db, agent, match.Args);
 			string response = await match.Command.ExecuteAsync(ctx, ct);
-			await channelClient.SendMessageAsync(message.ChatId, response, message.ExternalId, ct);
+			await channel.SendMessageAsync(message.ChatId, response, message.ExternalId, ct);
 
 			// Persist so AI sees the response in history
 			db.Messages.Add(new MessageEntity {
@@ -169,7 +172,7 @@ public sealed class ConversationService(
 			return;
 		}
 
-		await channelClient.SetTypingAsync(message.ChatId, ct);
+		await channel.SetTypingAsync(message.ChatId, ct);
 
 		// Load messages from current session (exclude queued — they're not yet visible to AI)
 		List<MessageEntity> recentMessages = await db.Messages
@@ -201,7 +204,8 @@ public sealed class ConversationService(
 		}
 
 		ToolContext.ChatId               = message.ChatId;
-		ToolContext.Channel              = channelClient;
+		ToolContext.Channel              = channel;
+		ToolContext.ChannelName          = message.Channel;
 		ToolContext.MessageExternalId    = message.ExternalId;
 		ToolContext.NotificationsEnabled = agent.ToolNotifications;
 		ToolContext.AgentId              = agent.Id;
@@ -248,7 +252,7 @@ public sealed class ConversationService(
 				(string? content, bool shouldQuote) = ResponseDirectives.Parse(msg.Content);
 				if (content is not null) {
 					content = await this.DenormalizeMentionsAsync(content, message.ChatId, message.SenderId, ct);
-					externalId = await channelClient.SendMessageAsync(
+					externalId = await channel.SendMessageAsync(
 						message.ChatId, content, shouldQuote ? message.ExternalId : null, ct);
 					sentAnyMessage = true;
 				}
@@ -276,7 +280,7 @@ public sealed class ConversationService(
 
 		// Clear typing indicator if no message was sent (NO_RESPONSE)
 		if (!sentAnyMessage)
-			await channelClient.StopTypingAsync(message.ChatId, ct);
+			await channel.StopTypingAsync(message.ChatId, ct);
 
 		// Update session token stats from last response
 		if (lastUsage is not null) {
@@ -296,12 +300,12 @@ public sealed class ConversationService(
 			session.UpdatedAt                 = DateTimeOffset.UtcNow;
 			await db.SaveChangesAsync(ct);
 
-			await this.CheckCompactionTriggersAsync(db, session, agent, lastUsage, message.ChatId, ct);
+			await this.CheckCompactionTriggersAsync(db, session, agent, lastUsage, message.ChatId, message.Channel, ct);
 		}
 	}
 
 	private async Task CheckCompactionTriggersAsync(
-		LisDbContext db, SessionEntity session, AgentEntity agent, TokenUsage usage, string chatId, CancellationToken ct) {
+		LisDbContext db, SessionEntity session, AgentEntity agent, TokenUsage usage, string chatId, string channel, CancellationToken ct) {
 		int totalInput = usage.TotalInputTokens;
 		int thresholdPct = agent.CompactionThreshold > 0 ? agent.CompactionThreshold : 80;
 		int compactionThreshold = (int)(agent.ContextBudget * (thresholdPct / 100.0));
@@ -328,7 +332,7 @@ public sealed class ConversationService(
 			long splitId = CompactionService.CalculateSplitPoint(allMsgs, agent.KeepRecentTokens);
 
 			if (splitId > 0)
-				_ = Task.Run(() => compactionService.CompactAsync(chatId, splitId, CancellationToken.None), CancellationToken.None);
+				_ = Task.Run(() => compactionService.CompactAsync(chatId, splitId, channel, CancellationToken.None), CancellationToken.None);
 			return;
 		}
 
