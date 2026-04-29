@@ -107,6 +107,13 @@ if (Env("MEMORIES_EMBEDDING_ENABLED") == "true") builder.Services.AddEmbedding()
 // Channel
 if (Env("GOWA_ENABLED") == "true") builder.Services.AddWhatsApp();
 
+// Channel provider (resolves keyed IChannelClient by name)
+builder.Services.AddScoped<IChannelClientProvider, ChannelClientProvider>();
+
+// Default IChannelClient — backward compat (resolves to first registered channel)
+if (Env("GOWA_ENABLED") == "true")
+	builder.Services.AddScoped<IChannelClient>(sp => sp.GetRequiredKeyedService<IChannelClient>("whatsapp"));
+
 // Application services
 builder.Services.AddSingleton<ContextWindowBuilder>();
 builder.Services.AddSingleton<PromptComposer>();

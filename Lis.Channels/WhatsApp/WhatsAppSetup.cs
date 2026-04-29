@@ -35,7 +35,7 @@ public static class WhatsAppSetup {
 		});
 
 		services.AddSingleton<IMessageFormatter, WhatsAppFormatter>();
-		services.AddScoped<IChannelClient, WhatsAppClient>();
+		services.AddKeyedScoped<IChannelClient, WhatsAppClient>("whatsapp");
 
 		return services;
 	}
