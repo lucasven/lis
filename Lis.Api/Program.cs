@@ -47,6 +47,18 @@ builder.Services.AddOpenTelemetry()
 		   tracing.AddHttpClientInstrumentation(o => o.RecordException = true);
 		   tracing.AddSource("Microsoft.SemanticKernel*");
 		   tracing.AddSource(TraceAspect.ActivitySource.Name);
+
+		   // Opik LLM observability (sends GenAI traces to Opik via OTLP)
+		   if (Env("OPIK_ENABLED") == "true") {
+			   tracing.AddOtlpExporter("opik", options => {
+				   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
+				   options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+
+				   string headers = Env("OPIK_OTLP_HEADERS");
+				   if (headers.Length > 0)
+					   options.Headers = headers;
+			   });
+		   }
 	   })
 	   .UseGrafana();
 builder.Logging.AddOpenTelemetry(logging => {
