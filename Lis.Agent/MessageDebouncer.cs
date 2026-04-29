@@ -27,8 +27,8 @@ public sealed class MessageDebouncer(
 	private ChatState GetChatState(string chatId) =>
 		this._chats.GetOrAdd(chatId, _ => new ChatState());
 
-	private static IChannelClient GetChannelClient(IServiceScope scope) =>
-		scope.ServiceProvider.GetRequiredService<IChannelClient>();
+	private static IChannelClient GetChannelClient(IServiceScope scope, string channel) =>
+		scope.ServiceProvider.GetRequiredKeyedService<IChannelClient>(channel);
 
 	[Trace("MessageDebouncer > HandleIncomingAsync")]
 	public async Task HandleIncomingAsync(IncomingMessage message, CancellationToken ct) {
@@ -60,7 +60,7 @@ public sealed class MessageDebouncer(
 				try {
 					lock (state.Lock) { state.ReactedIds.Add(message.ExternalId); }
 					using IServiceScope reactScope = scopeFactory.CreateScope();
-					await GetChannelClient(reactScope).ReactAsync(
+					await GetChannelClient(reactScope, message.Channel).ReactAsync(
 						message.ExternalId, message.ChatId, lisOptions.Value.ReactOnMessageQueuedEmoji, CancellationToken.None);
 				} catch { /* best effort */ }
 			}
@@ -170,6 +170,7 @@ public sealed class MessageDebouncer(
 				.FirstOrDefaultAsync();
 			if (lastMsg is null) continue;
 
+			// TODO: resolve channel from ChatEntity once it has a Channel column (Task 10)
 			IncomingMessage synthetic = new() {
 				ExternalId = lastMsg.ExternalId ?? $"recovery-{chat.ExternalId}",
 				ChatId     = chat.ExternalId,
@@ -220,7 +221,7 @@ public sealed class MessageDebouncer(
 
 			// Flush loop: process queued messages
 			while (true) {
-				bool needsResponse = await this.FlushQueueAsync(message.ChatId, state);
+				bool needsResponse = await this.FlushQueueAsync(message.ChatId, message.Channel, state);
 				if (!needsResponse) break;
 
 				// New AI response for flushed messages
@@ -244,9 +245,9 @@ public sealed class MessageDebouncer(
 		}
 	}
 
-	private async Task<bool> FlushQueueAsync(string chatId, ChatState state) {
+	private async Task<bool> FlushQueueAsync(string chatId, string channelName, ChatState state) {
 		using IServiceScope scope   = scopeFactory.CreateScope();
-		IChannelClient      channel = GetChannelClient(scope);
+		IChannelClient      channel = GetChannelClient(scope, channelName);
 		LisDbContext        db      = scope.ServiceProvider.GetRequiredService<LisDbContext>();
 
 		// Remove clock reactions
@@ -295,7 +296,7 @@ public sealed class MessageDebouncer(
 				SenderName = msg.SenderName,
 				Body       = msg.Body,
 				Timestamp  = msg.Timestamp,
-				Channel    = "whatsapp"
+				Channel    = channelName
 			};
 			CommandContext ctx      = new(im, chat, session, db, agent, match.Args);
 			string        response = await match.Command.ExecuteAsync(ctx, CancellationToken.None);
