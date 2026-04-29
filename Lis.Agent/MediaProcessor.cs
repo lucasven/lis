@@ -12,7 +12,7 @@ public interface IMediaProcessor {
 public sealed record ProcessedMedia(byte[] Data, string MimeType, string? Transcription);
 
 public sealed class MediaProcessor(
-	IChannelClient          channelClient,
+	IChannelClientProvider  channelProvider,
 	ILogger<MediaProcessor> logger,
 	ITranscriptionService?  transcriptionService = null) : IMediaProcessor {
 
@@ -22,7 +22,8 @@ public sealed class MediaProcessor(
 	public async Task<ProcessedMedia?> ProcessAsync(IncomingMessage message, CancellationToken ct) {
 		if (message.MediaType is null) return null;
 
-		MediaDownload? download = await channelClient.DownloadMediaAsync(
+		IChannelClient channel = channelProvider.Get(message.Channel);
+		MediaDownload? download = await channel.DownloadMediaAsync(
 			message.ExternalId, message.ChatId, message.MediaPath, ct);
 
 		if (download is null) return null;

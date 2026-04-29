@@ -34,7 +34,7 @@ public sealed class CompactionService(
 	IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator = null) {
 
 	[Trace("CompactionService > CompactAsync")]
-	public async Task CompactAsync(string externalChatId, long splitMessageId, CancellationToken ct) {
+	public async Task CompactAsync(string externalChatId, long splitMessageId, string channel, CancellationToken ct) {
 		try {
 			using IServiceScope scope = scopeFactory.CreateScope();
 			LisDbContext        db    = scope.ServiceProvider.GetRequiredService<LisDbContext>();
@@ -143,7 +143,7 @@ public sealed class CompactionService(
 						EstimateBreakdown(newCtx, contentTotal);
 
 					await this.NotifyCompactionAsync(
-						externalChatId, agent, session.ContextTokens, total,
+						externalChatId, channel, agent, session.ContextTokens, total,
 						sysTokens, sumTokens, keptTokens, toolDefTokens, toolCallTokens, ct);
 				} catch (Exception ex) {
 					logger.LogWarning(ex, "Token counting or notification failed");
@@ -294,7 +294,7 @@ public sealed class CompactionService(
 	}
 
 	private async Task NotifyCompactionAsync(
-		string chatId, AgentEntity agent, long oldInputTokens,
+		string chatId, string channelName, AgentEntity agent, long oldInputTokens,
 		int newTotal, int systemTokens, int summaryTokens, int keptTokens,
 		int toolDefTokens, int toolCallTokens, CancellationToken ct) {
 		try {
@@ -310,7 +310,7 @@ public sealed class CompactionService(
 			           + $"\n  📊 Total: {FormatTokens(newTotal)}/{FormatTokens(budget)} ({pct}%)";
 
 			using IServiceScope scope = scopeFactory.CreateScope();
-			IChannelClient channel = scope.ServiceProvider.GetRequiredService<IChannelClient>();
+			IChannelClient channel = scope.ServiceProvider.GetRequiredKeyedService<IChannelClient>(channelName);
 			await channel.SendMessageAsync(chatId, msg, null, ct);
 		} catch (Exception ex) {
 			logger.LogWarning(ex, "Failed to send compaction notification");
