@@ -115,8 +115,13 @@ builder.Services.AddSingleton<ContextWindowBuilder>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ToolRunner>();
 
-// Conversation + Agent require both AI and Channel
-if (Env("ANTHROPIC_ENABLED") == "true" && Env("GOWA_ENABLED") == "true") {
+// Conversation + Agent require both AI and at least one Channel
+bool hasChannel = Env("GOWA_ENABLED") == "true"
+              || Env("TELEGRAM_ENABLED") == "true"
+              || Env("DISCORD_ENABLED") == "true"
+              || Env("MATTERMOST_ENABLED") == "true";
+
+if (Env("ANTHROPIC_ENABLED") == "true" && hasChannel) {
 	builder.Services.AddScoped<ConversationService>();
 	builder.Services.AddSingleton<IConversationService, MessageDebouncer>();
 	builder.Services.AddLisAgent();
