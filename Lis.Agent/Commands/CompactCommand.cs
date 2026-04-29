@@ -29,8 +29,9 @@ public sealed class CompactCommand(CompactionService compactionService, IOptions
 		long oldSessionId = ctx.Session.Id;
 		string chatExternalId = ctx.Chat.ExternalId;
 
+		string channel = ctx.Chat.Channel ?? ctx.Message.Channel;
 		_ = Task.Run(
-			() => compactionService.CompactAsync(chatExternalId, splitId, CancellationToken.None),
+			() => compactionService.CompactAsync(chatExternalId, splitId, channel, CancellationToken.None),
 			CancellationToken.None);
 
 		return $"⚙️ Compacting session #{oldSessionId}...";
