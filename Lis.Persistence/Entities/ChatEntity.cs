@@ -70,6 +70,11 @@ public sealed class ChatEntity {
 	[JsonPropertyName("group_topic")]
 	public string? GroupTopic { get; set; }
 
+	[MaxLength(32)]
+	[Column("channel", TypeName = "varchar(32)")]
+	[JsonPropertyName("channel")]
+	public string? Channel { get; set; }
+
 	public SessionEntity? CurrentSession { get; set; }
 
 	public AgentEntity? Agent { get; set; }

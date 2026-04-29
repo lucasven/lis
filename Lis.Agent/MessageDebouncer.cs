@@ -170,7 +170,6 @@ public sealed class MessageDebouncer(
 				.FirstOrDefaultAsync();
 			if (lastMsg is null) continue;
 
-			// TODO: resolve channel from ChatEntity once it has a Channel column (Task 10)
 			IncomingMessage synthetic = new() {
 				ExternalId = lastMsg.ExternalId ?? $"recovery-{chat.ExternalId}",
 				ChatId     = chat.ExternalId,
@@ -178,7 +177,7 @@ public sealed class MessageDebouncer(
 				SenderName = lastMsg.SenderName,
 				Timestamp  = lastMsg.Timestamp,
 				Body       = lastMsg.Body,
-				Channel    = "whatsapp"
+				Channel    = chat.Channel ?? "whatsapp"
 			};
 			_ = Task.Run(() => this.RespondInScopeAsync(synthetic));
 		}

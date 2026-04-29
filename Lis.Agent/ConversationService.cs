@@ -404,6 +404,7 @@ public sealed class ConversationService(
 				IsGroup        = message.IsGroup,
 				RequireMention = message.IsGroup,
 				GroupTopic     = message.IsGroup ? message.ChatTopic : null,
+				Channel        = message.Channel,
 				Enabled        = message.IsGroup || message.SenderId == ownerJid,
 				CreatedAt      = DateTimeOffset.UtcNow,
 				UpdatedAt      = DateTimeOffset.UtcNow
@@ -412,6 +413,7 @@ public sealed class ConversationService(
 			await db.SaveChangesAsync(ct);
 		} else {
 			chat.UpdatedAt = DateTimeOffset.UtcNow;
+			chat.Channel ??= message.Channel;
 
 			if (message.IsGroup && message.ChatName is not null)
 				chat.Name = message.ChatName;
