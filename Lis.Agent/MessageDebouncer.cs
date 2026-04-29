@@ -176,7 +176,8 @@ public sealed class MessageDebouncer(
 				SenderId   = lastMsg.SenderId ?? "",
 				SenderName = lastMsg.SenderName,
 				Timestamp  = lastMsg.Timestamp,
-				Body       = lastMsg.Body
+				Body       = lastMsg.Body,
+				Channel    = "whatsapp"
 			};
 			_ = Task.Run(() => this.RespondInScopeAsync(synthetic));
 		}
@@ -293,7 +294,8 @@ public sealed class MessageDebouncer(
 				SenderId   = msg.SenderId ?? "",
 				SenderName = msg.SenderName,
 				Body       = msg.Body,
-				Timestamp  = msg.Timestamp
+				Timestamp  = msg.Timestamp,
+				Channel    = "whatsapp"
 			};
 			CommandContext ctx      = new(im, chat, session, db, agent, match.Args);
 			string        response = await match.Command.ExecuteAsync(ctx, CancellationToken.None);

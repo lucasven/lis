@@ -48,7 +48,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_DisabledChat_ReturnsFalse() {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = false };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner", Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner");
 
@@ -58,7 +58,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_Owner_ReturnsTrue() {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner@jid" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner@jid", Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -74,7 +74,7 @@ public class AgentServiceTests : IDisposable {
 				new ChatAllowedSenderEntity { SenderId = "allowed@jid" }
 			]
 		};
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "allowed@jid" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "allowed@jid", Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -84,7 +84,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_UnknownSender_ReturnsFalse() {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "stranger@jid" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "stranger@jid", Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -94,7 +94,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_GroupWithRequireMention_DeniesUnmentioned() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true, OpenGroup = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -104,7 +104,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_GroupWithRequireMention_AllowsMentioned() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true, OpenGroup = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, IsBotMentioned = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, IsBotMentioned = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -114,7 +114,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_GroupOwnerRespectsMention() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -124,7 +124,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_GroupOwnerWithMention_ReturnsTrue() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true, IsBotMentioned = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true, IsBotMentioned = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -134,7 +134,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_OpenGroup_AllowsAnySender() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, OpenGroup = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -144,7 +144,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_OpenGroupRequireMention_DeniesWithoutMention() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, OpenGroup = true, RequireMention = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -154,7 +154,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_ClosedGroupStranger_Denied() {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
 
@@ -164,7 +164,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public void ShouldRespond_EmptyOwnerJid_DeniesAll() {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "anyone" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "anyone", Channel = "whatsapp" };
 
 		bool result = this._sut.ShouldRespond(chat, msg, "");
 
@@ -194,7 +194,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public async Task DetectMention_NonGroupMessage_Skipped() {
 		ChatEntity chat = new() { ExternalId = "c1" };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "s1", IsGroup = false, Body = "Lis hello" };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "s1", IsGroup = false, Body = "Lis hello", Channel = "whatsapp" };
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
 
@@ -204,7 +204,7 @@ public class AgentServiceTests : IDisposable {
 	[Fact]
 	public async Task DetectMention_AlreadyMentioned_Skipped() {
 		ChatEntity chat = new() { ExternalId = "g1" };
-		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "s1", IsGroup = true, IsBotMentioned = true };
+		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "s1", IsGroup = true, IsBotMentioned = true, Channel = "whatsapp" };
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
 
@@ -223,7 +223,7 @@ public class AgentServiceTests : IDisposable {
 
 		IncomingMessage msg = new() {
 			ExternalId = "m1", ChatId = "g1", SenderId = "s1",
-			IsGroup = true, RepliedId = "bot-msg-1"
+			IsGroup = true, RepliedId = "bot-msg-1", Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
@@ -243,7 +243,7 @@ public class AgentServiceTests : IDisposable {
 
 		IncomingMessage msg = new() {
 			ExternalId = "m1", ChatId = "g1", SenderId = "s1",
-			IsGroup = true, RepliedId = "user-msg-1"
+			IsGroup = true, RepliedId = "user-msg-1", Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
@@ -258,7 +258,7 @@ public class AgentServiceTests : IDisposable {
 
 		IncomingMessage msg = new() {
 			ExternalId = "m1", ChatId = "g1", SenderId = "s1",
-			IsGroup = true, Body = "hey lis what do you think?"
+			IsGroup = true, Body = "hey lis what do you think?", Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
@@ -273,7 +273,7 @@ public class AgentServiceTests : IDisposable {
 
 		IncomingMessage msg = new() {
 			ExternalId = "m1", ChatId = "g1", SenderId = "s1",
-			IsGroup = true, Body = "lista pra mim todas as tools"
+			IsGroup = true, Body = "lista pra mim todas as tools", Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
@@ -288,7 +288,7 @@ public class AgentServiceTests : IDisposable {
 
 		IncomingMessage msg = new() {
 			ExternalId = "m1", ChatId = "g1", SenderId = "s1",
-			IsGroup = true, Body = "hello everyone"
+			IsGroup = true, Body = "hello everyone", Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);
@@ -302,7 +302,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", AgentId = agent.Id, Agent = agent };
 
 		IncomingMessage msg = new() {
-			ExternalId = "m1", ChatId = "g1", SenderId = "s1", IsGroup = true
+			ExternalId = "m1", ChatId = "g1", SenderId = "s1", IsGroup = true, Channel = "whatsapp"
 		};
 
 		await this._sut.DetectMentionAsync(this._db, chat, msg, CancellationToken.None);

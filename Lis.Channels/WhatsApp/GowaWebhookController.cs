@@ -100,7 +100,8 @@ public class GowaWebhookController(
 			RepliedContent = payload.QuotedBody,
 			MediaType      = payload.MediaType,
 			MediaCaption   = payload.MediaCaption,
-			MediaPath      = payload.MediaPath
+			MediaPath      = payload.MediaPath,
+			Channel        = "whatsapp"
 		};
 
 		if (isGroup && payload.ChatId is { Length: > 0 } groupChatId) {

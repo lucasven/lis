@@ -18,6 +18,9 @@ public sealed class IncomingMessage {
 	public string? MediaCaption { get; init; }
 	public string? MediaPath { get; init; }
 
+	/// <summary>Channel this message came from (e.g. "whatsapp", "telegram", "discord", "mattermost").</summary>
+	public required string Channel { get; init; }
+
 	/// <summary>Set after ingestion — the DB-generated primary key.</summary>
 	public long DbId { get; set; }
 }
