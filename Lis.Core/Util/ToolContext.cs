@@ -3,17 +3,19 @@ using Lis.Core.Channel;
 namespace Lis.Core.Util;
 
 public static class ToolContext {
-	private static readonly AsyncLocal<string?>         ChatIdLocal          = new();
-	private static readonly AsyncLocal<IChannelClient?> ChannelLocal         = new();
-	private static readonly AsyncLocal<bool>            NotificationsLocal   = new();
+	private static readonly AsyncLocal<string?>         ChatIdLocal            = new();
+	private static readonly AsyncLocal<IChannelClient?> ChannelLocal           = new();
+	private static readonly AsyncLocal<string?>         ChannelNameLocal       = new();
+	private static readonly AsyncLocal<bool>            NotificationsLocal     = new();
 	private static readonly AsyncLocal<string?>         MessageExternalIdLocal = new();
-	private static readonly AsyncLocal<int>             CacheBreakLocal      = new();
-	private static readonly AsyncLocal<long?>           AgentIdLocal         = new();
-	private static readonly AsyncLocal<string?>         SenderJidLocal       = new();
-	private static readonly AsyncLocal<bool>            IsOwnerLocal         = new();
+	private static readonly AsyncLocal<int>             CacheBreakLocal        = new();
+	private static readonly AsyncLocal<long?>           AgentIdLocal           = new();
+	private static readonly AsyncLocal<string?>         SenderJidLocal         = new();
+	private static readonly AsyncLocal<bool>            IsOwnerLocal           = new();
 
 	public static string?         ChatId               { get => ChatIdLocal.Value;        set => ChatIdLocal.Value = value; }
 	public static IChannelClient? Channel              { get => ChannelLocal.Value;        set => ChannelLocal.Value = value; }
+	public static string?         ChannelName          { get => ChannelNameLocal.Value;    set => ChannelNameLocal.Value = value; }
 	public static bool            NotificationsEnabled { get => NotificationsLocal.Value;  set => NotificationsLocal.Value = value; }
 	public static string?         MessageExternalId    { get => MessageExternalIdLocal.Value; set => MessageExternalIdLocal.Value = value; }
 
