@@ -1,6 +1,7 @@
 using Grafana.OpenTelemetry;
 
 using Lis.Agent;
+using Lis.Channels.Mattermost;
 using Lis.Channels.WhatsApp;
 using Lis.Core.Channel;
 using Lis.Core.Configuration;
@@ -116,8 +117,9 @@ if (Env("LIS_COMPACTION_PROVIDER") is { Length: > 0 } compProvider
 // Embedding (optional — enables vector search for memories)
 if (Env("MEMORIES_EMBEDDING_ENABLED") == "true") builder.Services.AddEmbedding();
 
-// Channel
+// Channels
 if (Env("GOWA_ENABLED") == "true") builder.Services.AddWhatsApp();
+if (Env("MATTERMOST_ENABLED") == "true") builder.Services.AddMattermost();
 
 // Channel provider (resolves keyed IChannelClient by name)
 builder.Services.AddScoped<IChannelClientProvider, ChannelClientProvider>();
