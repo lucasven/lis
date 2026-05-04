@@ -118,13 +118,29 @@ public sealed class MattermostWebSocketConnection(
 			this._writeLock.Release();
 		}
 
-		using JsonDocument? response = await this.ReceiveAsync(ct);
-		string? status = response?.RootElement.TryGetProperty("status", out JsonElement s) == true
-			? s.GetString()
-			: null;
+		// Mattermost sends an unsolicited "hello" event right after connect — skip it
+		// (and any other broadcast events) until we get our challenge's seq_reply.
+		JsonDocument? response;
+		while (true) {
+			response = await this.ReceiveAsync(ct);
+			if (response is null)
+				throw new InvalidOperationException("WebSocket closed during authentication");
 
-		if (status != "OK")
-			throw new InvalidOperationException($"WebSocket authentication failed: {response?.RootElement}");
+			if (response.RootElement.TryGetProperty("seq_reply", out _)
+			 || response.RootElement.TryGetProperty("status",    out _))
+				break;
+
+			response.Dispose();
+		}
+
+		using (response) {
+			string? status = response.RootElement.TryGetProperty("status", out JsonElement s)
+				? s.GetString()
+				: null;
+
+			if (status != "OK")
+				throw new InvalidOperationException($"WebSocket authentication failed: {response.RootElement}");
+		}
 
 		logger.LogInformation("WebSocket authenticated successfully");
 	}
