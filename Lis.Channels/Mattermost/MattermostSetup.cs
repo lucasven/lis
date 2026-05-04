@@ -10,10 +10,9 @@ namespace Lis.Channels.Mattermost;
 public static class MattermostSetup {
 	public static IServiceCollection AddMattermost(this IServiceCollection services) {
 		MattermostOptions opts = new() {
-			BaseUrl       = Env("MATTERMOST_URL"),
-			BotToken      = Env("MATTERMOST_BOT_TOKEN"),
-			WebhookSecret = Env("MATTERMOST_WEBHOOK_SECRET"),
-			BotUserId     = Env("MATTERMOST_BOT_USER_ID"),
+			BaseUrl   = Env("MATTERMOST_URL"),
+			BotToken  = Env("MATTERMOST_BOT_TOKEN"),
+			BotUserId = Env("MATTERMOST_BOT_USER_ID"),
 		};
 
 		services.AddSingleton(Options.Create(opts));
@@ -25,6 +24,8 @@ public static class MattermostSetup {
 		});
 
 		services.AddSingleton<MattermostFormatter>();
+		services.AddSingleton<MattermostWebSocketConnection>();
+		services.AddHostedService<MattermostWebSocketService>();
 		services.AddKeyedScoped<IChannelClient, MattermostClient>("mattermost");
 
 		return services;

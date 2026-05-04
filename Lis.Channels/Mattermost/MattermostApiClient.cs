@@ -36,6 +36,37 @@ public sealed class MattermostApiClient(HttpClient http) {
 	public async Task<byte[]> GetFileAsync(string fileId, CancellationToken ct = default) {
 		return await http.GetByteArrayAsync($"/api/v4/files/{fileId}", ct);
 	}
+
+	[Trace("MattermostApiClient > CreateReactionAsync")]
+	public async Task CreateReactionAsync(
+		string userId, string postId, string emojiName, CancellationToken ct = default) {
+
+		var payload = new {
+			user_id    = userId,
+			post_id    = postId,
+			emoji_name = emojiName,
+			create_at  = 0
+		};
+
+		HttpResponseMessage response = await http.PostAsJsonAsync("/api/v4/reactions", payload, ct);
+		response.EnsureSuccessStatusCode();
+	}
+
+	[Trace("MattermostApiClient > DeleteReactionAsync")]
+	public async Task DeleteReactionAsync(
+		string userId, string postId, string emojiName, CancellationToken ct = default) {
+
+		HttpResponseMessage response = await http.DeleteAsync(
+			$"/api/v4/reactions/{userId}/{postId}/{emojiName}", ct);
+		response.EnsureSuccessStatusCode();
+	}
+
+	[Trace("MattermostApiClient > ViewChannelAsync")]
+	public async Task ViewChannelAsync(string userId, string channelId, CancellationToken ct = default) {
+		HttpResponseMessage response = await http.PostAsJsonAsync(
+			$"/api/v4/channels/members/{userId}/{channelId}/view", new { }, ct);
+		response.EnsureSuccessStatusCode();
+	}
 }
 
 public sealed class MattermostPost {
