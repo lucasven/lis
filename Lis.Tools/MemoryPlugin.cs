@@ -33,6 +33,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 
 		MemoryEntity memory = new() {
 			Content   = content.Trim(),
+			AgentId   = ToolContext.AgentId,
 			ContactId = contactId,
 			Embedding = embedding,
 			CreatedAt = DateTimeOffset.UtcNow,
@@ -158,6 +159,13 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 		return new Vector(result[0].Vector);
 	}
 
+	private static IQueryable<MemoryEntity> ScopeByAgent(IQueryable<MemoryEntity> q) {
+		long? agentId = ToolContext.AgentId;
+		if (agentId is > 0)
+			q = q.Where(m => m.AgentId == agentId || m.AgentId == null);
+		return q;
+	}
+
 	private static async Task<List<MemoryEntity>> VectorSearchAsync(
 		LisDbContext db,
 		IEmbeddingGenerator<string, Embedding<float>> embeddingGen,
@@ -170,6 +178,8 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 		IQueryable<MemoryEntity> q = db.Memories
 			.Include(m => m.Contact)
 			.Where(m => m.Embedding != null);
+
+		q = ScopeByAgent(q);
 
 		if (contactId is not null)
 			q = q.Where(m => m.ContactId == contactId);
@@ -186,6 +196,8 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 		long? contactId) {
 
 		IQueryable<MemoryEntity> q = db.Memories.Include(m => m.Contact);
+
+		q = ScopeByAgent(q);
 
 		if (contactId is not null)
 			q = q.Where(m => m.ContactId == contactId);
