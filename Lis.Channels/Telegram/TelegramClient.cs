@@ -13,16 +13,25 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 	public async Task<string?> SendMessageAsync(
 		string chatId, string message, string? replyToId = null, CancellationToken ct = default) {
 
-		string formatted = formatter.Format(message);
-		Message sent = await bot.SendMessage(
-			chatId: long.Parse(chatId),
-			text: formatted,
-			parseMode: ParseMode.MarkdownV2,
-			replyParameters: replyToId is not null
-				? new ReplyParameters { MessageId = int.Parse(replyToId) }
-				: null,
-			cancellationToken: ct);
-		return sent.MessageId.ToString();
+		string             formatted = formatter.Format(message);
+		long               chatIdNum = long.Parse(chatId);
+		ReplyParameters?   reply     = replyToId is not null
+			? new ReplyParameters { MessageId = int.Parse(replyToId) }
+			: null;
+
+		try {
+			Message sent = await bot.SendMessage(
+				chatId: chatIdNum, text: formatted, parseMode: ParseMode.MarkdownV2,
+				replyParameters: reply, cancellationToken: ct);
+			return sent.MessageId.ToString();
+		}
+		catch (global::Telegram.Bot.Exceptions.ApiRequestException) {
+			// Malformed markdown — retry as plain text
+			Message sent = await bot.SendMessage(
+				chatId: chatIdNum, text: message,
+				replyParameters: reply, cancellationToken: ct);
+			return sent.MessageId.ToString();
+		}
 	}
 
 	[Trace("TelegramClient > SetTypingAsync")]
