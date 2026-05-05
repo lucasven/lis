@@ -4,7 +4,7 @@ using Lis.Core.Util;
 
 namespace Lis.Channels.WhatsApp;
 
-public sealed class WhatsAppClient(GowaClient gowa, IMessageFormatter formatter) : IChannelClient {
+public sealed class WhatsAppClient(GowaClient gowa, WhatsAppFormatter formatter) : IChannelClient {
 
 	[Trace("WhatsAppClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(

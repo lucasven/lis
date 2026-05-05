@@ -34,7 +34,7 @@ public static class WhatsAppSetup {
 			options.TotalRequestTimeout.Timeout     = TimeSpan.FromSeconds(120);
 		});
 
-		services.AddSingleton<IMessageFormatter, WhatsAppFormatter>();
+		services.AddSingleton<WhatsAppFormatter>();
 		services.AddKeyedScoped<IChannelClient, WhatsAppClient>("whatsapp");
 
 		return services;

@@ -2,7 +2,10 @@ using Grafana.OpenTelemetry;
 
 using Lis.Agent;
 using Lis.Channels.Mattermost;
+using Lis.Channels.Telegram;
 using Lis.Channels.WhatsApp;
+using Telegram.Bot;
+using Telegram.Bot.Types.Enums;
 using Lis.Core.Channel;
 using Lis.Core.Configuration;
 using Lis.Core.Util;
@@ -120,6 +123,7 @@ if (Env("MEMORIES_EMBEDDING_ENABLED") == "true") builder.Services.AddEmbedding()
 
 // Channels
 if (Env("GOWA_ENABLED") == "true") builder.Services.AddWhatsApp();
+if (Env("TELEGRAM_ENABLED") == "true") builder.Services.AddTelegram();
 if (Env("MATTERMOST_ENABLED") == "true") builder.Services.AddMattermost();
 
 // Channel provider (resolves keyed IChannelClient by name)
@@ -172,6 +176,20 @@ app.UseExceptionHandler();
 
 // Endpoints
 app.MapControllers();
+
+// Register Telegram webhook
+if (Env("TELEGRAM_ENABLED") == "true" && Env("TELEGRAM_WEBHOOK_URL") is { Length: > 0 } webhookUrl) {
+	TelegramBotClient telegramBot = app.Services.GetRequiredService<TelegramBotClient>();
+	TelegramOptions   telegramOpts = app.Services.GetRequiredService<IOptions<TelegramOptions>>().Value;
+	await telegramBot.SetWebhook(
+		url: webhookUrl,
+		certificate: null,
+		ipAddress: null,
+		maxConnections: null,
+		allowedUpdates: [UpdateType.Message],
+		dropPendingUpdates: false,
+		secretToken: telegramOpts.WebhookSecret);
+}
 
 await app.RunAsync();
 return;
