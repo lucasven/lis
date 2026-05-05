@@ -19,6 +19,10 @@ public static class TelegramSetup {
 		services.AddSingleton<TelegramFormatter>();
 		services.AddKeyedScoped<IChannelClient, TelegramClient>("telegram");
 
+		// Use polling when no webhook URL is configured
+		if (Env("TELEGRAM_WEBHOOK_URL") is not { Length: > 0 })
+			services.AddHostedService<TelegramPollingService>();
+
 		return services;
 	}
 

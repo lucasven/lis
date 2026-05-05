@@ -24,7 +24,7 @@ public sealed class AgentCommand(
 			return this.ShowCurrentAgent(ctx);
 
 		// Write subcommands are owner-only
-		if (ctx.Message.SenderId != lisOptions.Value.OwnerJid)
+		if (!lisOptions.Value.IsOwner(ctx.Message.SenderId))
 			return "⛔ This command requires owner authorization.";
 
 		string[] parts = ctx.Args.Split(' ', StringSplitOptions.RemoveEmptyEntries);

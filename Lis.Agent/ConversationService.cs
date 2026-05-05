@@ -66,7 +66,7 @@ public sealed class ConversationService(
 	[Trace("ConversationService > HandleReactionAsync")]
 	public async Task HandleReactionAsync(string messageId, string chatId, string emoji, string senderId, CancellationToken ct) {
 		// Only owner reactions resolve approvals
-		if (senderId != lisOptions.Value.OwnerJid) return;
+		if (!lisOptions.Value.IsOwner(senderId)) return;
 
 		ApprovalDecision? decision = emoji switch {
 			"👍" => ApprovalDecision.Once,
@@ -89,7 +89,7 @@ public sealed class ConversationService(
 		using IServiceScope scope = scopeFactory.CreateScope();
 		LisDbContext        db    = scope.ServiceProvider.GetRequiredService<LisDbContext>();
 
-		ChatEntity chat = await UpsertChatAsync(db, message, lisOptions.Value.OwnerJid, ct);
+		ChatEntity chat = await UpsertChatAsync(db, message, lisOptions.Value, ct);
 		SessionEntity session = await this.EnsureSessionAsync(db, chat, ct);
 		await PersistMessageAsync(db, session, message, queued, ct);
 
@@ -104,7 +104,7 @@ public sealed class ConversationService(
 		}
 
 		// Full auth: mention detection + gate check (single entry point)
-		bool shouldRespond = await agentService.ShouldRespondAsync(db, chat, message, lisOptions.Value.OwnerJid, ct);
+		bool shouldRespond = await agentService.ShouldRespondAsync(db, chat, message, lisOptions.Value, ct);
 		return (chat, shouldRespond);
 	}
 
@@ -139,7 +139,7 @@ public sealed class ConversationService(
 
 		// Handle commands before AI processing
 		if (commandRouter.Match(message.Body) is { } match) {
-			if (match.Command.OwnerOnly && message.SenderId != lisOptions.Value.OwnerJid) {
+			if (match.Command.OwnerOnly && !lisOptions.Value.IsOwner(message.SenderId)) {
 				string denied = "⛔ This command requires owner authorization.";
 				await channel.SendMessageAsync(message.ChatId, denied, message.ExternalId, ct);
 
@@ -214,7 +214,7 @@ public sealed class ConversationService(
 		ToolContext.NotificationsEnabled = agent.ToolNotifications;
 		ToolContext.AgentId              = agent.Id;
 		ToolContext.SenderJid            = message.SenderId;
-		ToolContext.IsOwner              = message.SenderId == lisOptions.Value.OwnerJid;
+		ToolContext.IsOwner              = lisOptions.Value.IsOwner(message.SenderId);
 
 		IChatCompletionService chatService = kernel.GetRequiredService<IChatCompletionService>();
 
@@ -392,7 +392,7 @@ public sealed class ConversationService(
 	}
 
 	private static async Task<ChatEntity> UpsertChatAsync(
-		LisDbContext db, IncomingMessage message, string ownerJid, CancellationToken ct) {
+		LisDbContext db, IncomingMessage message, LisOptions opts, CancellationToken ct) {
 		ChatEntity? chat = await db.Chats
 								   .Include(c => c.CurrentSession)
 								   .Include(c => c.AllowedSenders)
@@ -409,7 +409,7 @@ public sealed class ConversationService(
 				RequireMention = message.IsGroup,
 				GroupTopic     = message.IsGroup ? message.ChatTopic : null,
 				Channel        = message.Channel,
-				Enabled        = message.IsGroup || message.SenderId == ownerJid,
+				Enabled        = message.IsGroup || opts.IsOwner(message.SenderId),
 				CreatedAt      = DateTimeOffset.UtcNow,
 				UpdatedAt      = DateTimeOffset.UtcNow
 			};

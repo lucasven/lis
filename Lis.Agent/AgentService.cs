@@ -70,15 +70,15 @@ public sealed class AgentService(
 	/// Single entry point for all callers — prevents forgetting mention detection.
 	/// </summary>
 	public async Task<bool> ShouldRespondAsync(
-		LisDbContext db, ChatEntity chat, IncomingMessage message, string ownerJid, CancellationToken ct) {
+		LisDbContext db, ChatEntity chat, IncomingMessage message, LisOptions opts, CancellationToken ct) {
 		await this.DetectMentionAsync(db, chat, message, ct);
-		return this.ShouldRespond(chat, message, ownerJid);
+		return this.ShouldRespond(chat, message, opts);
 	}
 
-	internal bool ShouldRespond(ChatEntity chat, IncomingMessage message, string ownerJid) {
+	internal bool ShouldRespond(ChatEntity chat, IncomingMessage message, LisOptions opts) {
 		if (!chat.Enabled) return false;
 
-		bool isOwner = !string.IsNullOrEmpty(ownerJid) && message.SenderId == ownerJid;
+		bool isOwner = opts.IsOwner(message.SenderId);
 
 		// Mention gate applies to everyone (including owner)
 		if (message.IsGroup && chat.RequireMention && !message.IsBotMentioned) return false;

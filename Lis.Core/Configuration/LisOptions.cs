@@ -2,6 +2,14 @@ namespace Lis.Core.Configuration;
 
 public sealed class LisOptions {
 	public string OwnerJid                { get; init; } = "";
+
+	private HashSet<string>? _ownerIds;
+	public bool IsOwner(string senderId) {
+		this._ownerIds ??= this.OwnerJid
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			.ToHashSet();
+		return this._ownerIds.Contains(senderId);
+	}
 	public string Timezone                { get; init; } = "E. South America Standard Time";
 	public int    MessageDebounceMs       { get; init; } = 3000;
 	public bool   ToolNotifications       { get; init; } = true;
