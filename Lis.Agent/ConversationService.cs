@@ -413,6 +413,14 @@ public sealed class ConversationService(
 				CreatedAt      = DateTimeOffset.UtcNow,
 				UpdatedAt      = DateTimeOffset.UtcNow
 			};
+
+			// Assign agent from channel hint (e.g., multi-bot Mattermost)
+			if (message.AgentName is { Length: > 0 } agentName) {
+				AgentEntity? hintAgent = await db.Agents.FirstOrDefaultAsync(a => a.Name == agentName, ct);
+				if (hintAgent is not null)
+					chat.AgentId = hintAgent.Id;
+			}
+
 			db.Chats.Add(chat);
 			await db.SaveChangesAsync(ct);
 		} else {

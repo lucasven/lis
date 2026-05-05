@@ -12,31 +12,52 @@ using Microsoft.Extensions.Options;
 namespace Lis.Channels.Mattermost;
 
 public sealed class MattermostWebSocketService(
-	MattermostWebSocketConnection            connection,
+	MattermostBotRegistry                    registry,
 	IConversationService                     conversationService,
 	IOptions<MattermostOptions>              options,
+	ILoggerFactory                           loggerFactory,
 	ILogger<MattermostWebSocketService>      logger) : BackgroundService {
 
-	private static readonly TimeSpan InitialBackoff    = TimeSpan.FromSeconds(1);
-	private static readonly TimeSpan MaxBackoff        = TimeSpan.FromSeconds(60);
-	private static readonly TimeSpan HeartbeatTimeout  = TimeSpan.FromSeconds(60);
+	private static readonly TimeSpan InitialBackoff   = TimeSpan.FromSeconds(1);
+	private static readonly TimeSpan MaxBackoff       = TimeSpan.FromSeconds(60);
+	private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(60);
+
+	private readonly Dictionary<string, MattermostWebSocketConnection> _connections = new();
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+		List<Task> botTasks = registry.All
+			.Select(bot => this.RunBotLoopAsync(bot, stoppingToken))
+			.ToList();
+
+		await Task.WhenAll(botTasks);
+	}
+
+	public MattermostWebSocketConnection? GetConnection(string agentName) =>
+		this._connections.GetValueOrDefault(agentName);
+
+	private async Task RunBotLoopAsync(MattermostBotConfig bot, CancellationToken ct) {
+		ILogger<MattermostWebSocketConnection> connLogger =
+			loggerFactory.CreateLogger<MattermostWebSocketConnection>();
+
+		MattermostWebSocketConnection connection = new(bot, options.Value.BaseUrl, connLogger);
+		this._connections[bot.AgentName] = connection;
+
 		TimeSpan backoff = InitialBackoff;
 
-		while (!stoppingToken.IsCancellationRequested) {
+		while (!ct.IsCancellationRequested) {
 			try {
-				await connection.ConnectAsync(stoppingToken);
+				await connection.ConnectAsync(ct);
 				backoff = InitialBackoff;
-				await this.ListenLoopAsync(stoppingToken);
-			} catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
+				await this.ListenLoopAsync(connection, bot, ct);
+			} catch (OperationCanceledException) when (ct.IsCancellationRequested) {
 				break;
 			} catch (Exception ex) {
-				logger.LogWarning(ex, "WebSocket disconnected, reconnecting in {Backoff}s", backoff.TotalSeconds);
+				logger.LogWarning(ex, "WebSocket disconnected for {BotName}, reconnecting in {Backoff}s",
+					bot.AgentName, backoff.TotalSeconds);
 			}
 
 			try {
-				await Task.Delay(backoff, stoppingToken);
+				await Task.Delay(backoff, ct);
 			} catch (OperationCanceledException) {
 				break;
 			}
@@ -48,7 +69,9 @@ public sealed class MattermostWebSocketService(
 	}
 
 	[Trace("MattermostWebSocketService > ListenLoopAsync")]
-	private async Task ListenLoopAsync(CancellationToken ct) {
+	private async Task ListenLoopAsync(
+		MattermostWebSocketConnection connection, MattermostBotConfig bot, CancellationToken ct) {
+
 		while (!ct.IsCancellationRequested && connection.IsConnected) {
 			using CancellationTokenSource heartbeat = CancellationTokenSource.CreateLinkedTokenSource(ct);
 			heartbeat.CancelAfter(HeartbeatTimeout);
@@ -57,7 +80,8 @@ public sealed class MattermostWebSocketService(
 			try {
 				msg = await connection.ReceiveAsync(heartbeat.Token);
 			} catch (OperationCanceledException) when (!ct.IsCancellationRequested) {
-				logger.LogWarning("No message received in {Timeout}s, reconnecting", HeartbeatTimeout.TotalSeconds);
+				logger.LogWarning("No message received for {BotName} in {Timeout}s, reconnecting",
+					bot.AgentName, HeartbeatTimeout.TotalSeconds);
 				return;
 			}
 
@@ -73,20 +97,20 @@ public sealed class MattermostWebSocketService(
 				try {
 					switch (eventType) {
 						case "posted":
-							this.HandlePosted(msg.RootElement);
+							this.HandlePosted(msg.RootElement, bot);
 							break;
 						case "reaction_added":
 							this.HandleReactionAdded(msg.RootElement);
 							break;
 					}
 				} catch (Exception ex) {
-					logger.LogError(ex, "Error handling {EventType} event", eventType);
+					logger.LogError(ex, "Error handling {EventType} event for {BotName}", eventType, bot.AgentName);
 				}
 			}
 		}
 	}
 
-	private void HandlePosted(JsonElement root) {
+	private void HandlePosted(JsonElement root, MattermostBotConfig bot) {
 		if (!root.TryGetProperty("data", out JsonElement data)) return;
 
 		string? postJson = data.TryGetProperty("post", out JsonElement postEl)
@@ -97,8 +121,8 @@ public sealed class MattermostWebSocketService(
 		WsPost? post = JsonSerializer.Deserialize<WsPost>(postJson);
 		if (post is null) return;
 
-		if (options.Value.BotUserId is { Length: > 0 } botId && post.UserId == botId)
-			return;
+		// Skip messages from ANY bot in the registry
+		if (registry.IsBotUserId(post.UserId)) return;
 
 		if (string.IsNullOrEmpty(post.Message) && post.FileIds is not { Length: > 0 })
 			return;
@@ -114,12 +138,11 @@ public sealed class MattermostWebSocketService(
 			: null;
 
 		bool isBotMentioned = false;
-		if (options.Value.BotUserId is { Length: > 0 } botUid
-		    && data.TryGetProperty("mentions", out JsonElement mentionsEl)) {
+		if (data.TryGetProperty("mentions", out JsonElement mentionsEl)) {
 			string? mentionsJson = mentionsEl.GetString();
 			if (mentionsJson is not null) {
 				string[]? mentions = JsonSerializer.Deserialize<string[]>(mentionsJson);
-				isBotMentioned = mentions?.Contains(botUid) == true;
+				isBotMentioned = mentions?.Contains(bot.UserId) == true;
 			}
 		}
 
@@ -140,17 +163,19 @@ public sealed class MattermostWebSocketService(
 			ChatName       = channelName,
 			MediaType      = mediaPath is not null ? "file" : null,
 			MediaPath      = mediaPath,
-			Channel        = "mattermost"
+			Channel        = "mattermost",
+			AgentName      = bot.AgentName
 		};
 
 		Activity.Current?.SetTag("message.id", post.Id);
 		Activity.Current?.SetTag("chat.id", post.ChannelId);
+		Activity.Current?.SetTag("bot.agent", bot.AgentName);
 
 		_ = Task.Run(async () => {
 			try {
 				await conversationService.HandleIncomingAsync(message, CancellationToken.None);
 			} catch (Exception ex) {
-				logger.LogError(ex, "Error processing Mattermost message {PostId}", post.Id);
+				logger.LogError(ex, "Error processing Mattermost message {PostId} for {BotName}", post.Id, bot.AgentName);
 			}
 		});
 	}
@@ -166,8 +191,7 @@ public sealed class MattermostWebSocketService(
 		WsReaction? reaction = JsonSerializer.Deserialize<WsReaction>(reactionJson);
 		if (reaction is null) return;
 
-		if (options.Value.BotUserId is { Length: > 0 } botId && reaction.UserId == botId)
-			return;
+		if (registry.IsBotUserId(reaction.UserId)) return;
 
 		string? channelId = root.TryGetProperty("broadcast", out JsonElement bc)
 		                    && bc.TryGetProperty("channel_id", out JsonElement ch)

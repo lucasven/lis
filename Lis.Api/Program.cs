@@ -7,6 +7,7 @@ using Lis.Core.Channel;
 using Lis.Core.Configuration;
 using Lis.Core.Util;
 using Lis.Persistence;
+using Lis.Persistence.Entities;
 using Lis.Providers.Anthropic;
 using Lis.Providers.Embedding;
 using Lis.Providers.OpenAi;
@@ -152,6 +153,14 @@ using (IServiceScope scope = app.Services.CreateScope()) {
 	ModelSettings envModelSettings = scope.ServiceProvider.GetRequiredService<ModelSettings>();
 	LisOptions lisOpts = scope.ServiceProvider.GetRequiredService<IOptions<LisOptions>>().Value;
 	await agentService.SeedDefaultAsync(db, envModelSettings, lisOpts, CancellationToken.None);
+}
+
+// Map agent DB IDs → bot registry (for multi-bot Mattermost routing)
+if (app.Services.GetService<MattermostBotRegistry>() is { } botRegistry) {
+	using IServiceScope regScope = app.Services.CreateScope();
+	LisDbContext regDb = regScope.ServiceProvider.GetRequiredService<LisDbContext>();
+	foreach (AgentEntity a in await regDb.Agents.ToListAsync())
+		botRegistry.MapAgentId(a.Id, a.Name);
 }
 
 // Flush queued messages from crash recovery

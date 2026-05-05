@@ -6,13 +6,13 @@ using System.Text.Json.Nodes;
 using Lis.Core.Util;
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Lis.Channels.Mattermost;
 
 public sealed class MattermostWebSocketConnection(
-	IOptions<MattermostOptions>               options,
-	ILogger<MattermostWebSocketConnection>    logger) : IAsyncDisposable {
+	MattermostBotConfig                      botConfig,
+	string                                   baseUrl,
+	ILogger<MattermostWebSocketConnection>   logger) : IAsyncDisposable {
 
 	private readonly SemaphoreSlim _writeLock = new(1, 1);
 
@@ -21,6 +21,8 @@ public sealed class MattermostWebSocketConnection(
 
 	public bool IsConnected => this._socket?.State == WebSocketState.Open;
 
+	public MattermostBotConfig BotConfig => botConfig;
+
 	[Trace("MattermostWebSocketConnection > ConnectAsync")]
 	public async Task ConnectAsync(CancellationToken ct) {
 		await this.DisconnectAsync();
@@ -28,10 +30,10 @@ public sealed class MattermostWebSocketConnection(
 		this._seq    = 0;
 		this._socket = new ClientWebSocket();
 
-		Uri wsUri = BuildWebSocketUri(options.Value.BaseUrl);
+		Uri wsUri = BuildWebSocketUri(baseUrl);
 
 		if (logger.IsEnabled(LogLevel.Information))
-			logger.LogInformation("Connecting to Mattermost WebSocket at {Uri}", wsUri);
+			logger.LogInformation("Connecting bot {BotName} to Mattermost WebSocket at {Uri}", botConfig.AgentName, wsUri);
 
 		await this._socket.ConnectAsync(wsUri, ct);
 		await this.AuthenticateAsync(ct);
@@ -106,7 +108,7 @@ public sealed class MattermostWebSocketConnection(
 		JsonObject challenge = new() {
 			["seq"]    = this.NextSeq(),
 			["action"] = "authentication_challenge",
-			["data"]   = new JsonObject { ["token"] = options.Value.BotToken }
+			["data"]   = new JsonObject { ["token"] = botConfig.Token }
 		};
 
 		byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(challenge);
@@ -139,10 +141,11 @@ public sealed class MattermostWebSocketConnection(
 				: null;
 
 			if (status != "OK")
-				throw new InvalidOperationException($"WebSocket authentication failed: {response.RootElement}");
+				throw new InvalidOperationException($"WebSocket authentication failed for {botConfig.AgentName}: {response.RootElement}");
 		}
 
-		logger.LogInformation("WebSocket authenticated successfully");
+		if (logger.IsEnabled(LogLevel.Information))
+			logger.LogInformation("WebSocket authenticated successfully for bot {BotName}", botConfig.AgentName);
 	}
 
 	private static Uri BuildWebSocketUri(string baseUrl) {

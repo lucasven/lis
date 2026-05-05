@@ -21,6 +21,9 @@ public sealed class IncomingMessage {
 	/// <summary>Channel this message came from (e.g. "whatsapp", "telegram", "discord", "mattermost").</summary>
 	public required string Channel { get; init; }
 
+	/// <summary>Hint for agent assignment on new chats (e.g., from multi-bot Mattermost).</summary>
+	public string? AgentName { get; init; }
+
 	/// <summary>Set after ingestion — the DB-generated primary key.</summary>
 	public long DbId { get; set; }
 }
