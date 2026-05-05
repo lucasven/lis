@@ -14,15 +14,17 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 	private const string MustEscape = @"_[]()~`>#+-=|{}.!\";
 
 	// Placeholder tokens (non-printable sequences that won't appear in text)
-	private const string PH_BOLD_OPEN    = "\x02BO\x02";
-	private const string PH_BOLD_CLOSE   = "\x02BC\x02";
-	private const string PH_ITALIC_OPEN  = "\x02IO\x02";
-	private const string PH_ITALIC_CLOSE = "\x02IC\x02";
-	private const string PH_STRIKE_OPEN  = "\x02SO\x02";
-	private const string PH_STRIKE_CLOSE = "\x02SC\x02";
-	private const string PH_UNDER_OPEN   = "\x02UO\x02";
-	private const string PH_UNDER_CLOSE  = "\x02UC\x02";
-	private const string PH_QUOTE        = "\x02BQ\x02";
+	// NOTE: must use \u0002 not \x02 — C# \x escape is greedy and consumes hex chars (A-F)
+	// that follow, e.g. \x02B becomes U+002B (+) instead of STX + 'B'
+	private const string PH_BOLD_OPEN    = "\u0002BO\u0002";
+	private const string PH_BOLD_CLOSE   = "\u0002BC\u0002";
+	private const string PH_ITALIC_OPEN  = "\u0002IO\u0002";
+	private const string PH_ITALIC_CLOSE = "\u0002IC\u0002";
+	private const string PH_STRIKE_OPEN  = "\u0002SO\u0002";
+	private const string PH_STRIKE_CLOSE = "\u0002SC\u0002";
+	private const string PH_UNDER_OPEN   = "\u0002UO\u0002";
+	private const string PH_UNDER_CLOSE  = "\u0002UC\u0002";
+	private const string PH_QUOTE        = "\u0002BQ\u0002";
 
 	[GeneratedRegex(@"```([\s\S]*?)```", RegexOptions.None)]
 	private static partial Regex FencedCodeRegex();
