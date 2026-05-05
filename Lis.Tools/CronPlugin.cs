@@ -43,7 +43,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 
 		DateTimeOffset now = DateTimeOffset.UtcNow;
 		TimeZoneInfo tz = timezone is not null
-			? TimeZoneInfo.FindSystemTimeZoneById(timezone)
+			? TimeZoneHelper.Find(timezone)
 			: TimeZoneInfo.Utc;
 
 		CronExpression cron    = CronExpression.Parse(cronExpression, CronFormat.Standard);
@@ -147,7 +147,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 		if (enabled is not null) task.Enabled = enabled.Value;
 
 		TimeZoneInfo tz = task.Timezone is not null
-			? TimeZoneInfo.FindSystemTimeZoneById(task.Timezone)
+			? TimeZoneHelper.Find(task.Timezone)
 			: TimeZoneInfo.Utc;
 		CronExpression cron = CronExpression.Parse(task.CronExpression, CronFormat.Standard);
 		task.NextRunAt = cron.GetNextOccurrence(DateTimeOffset.UtcNow, tz);

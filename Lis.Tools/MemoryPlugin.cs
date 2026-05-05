@@ -17,6 +17,8 @@ namespace Lis.Tools;
 
 public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 
+	private const int MaxSearchResults = 10;
+
 	[KernelFunction("create_memory")]
 	[Description("Store a new memory. Optionally link to a person by name.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -186,7 +188,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 
 		return await q
 			.OrderBy(m => m.Embedding!.CosineDistance(queryVector))
-			.Take(10)
+			.Take(MaxSearchResults)
 			.ToListAsync();
 	}
 
@@ -207,7 +209,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 				.Matches(EF.Functions.WebSearchToTsQuery("simple", query)))
 			.OrderByDescending(m => EF.Functions.ToTsVector("simple", m.Content)
 				.Rank(EF.Functions.WebSearchToTsQuery("simple", query)))
-			.Take(10)
+			.Take(MaxSearchResults)
 			.ToListAsync();
 	}
 }

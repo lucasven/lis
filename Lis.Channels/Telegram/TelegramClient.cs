@@ -1,13 +1,15 @@
 using Lis.Core.Channel;
 using Lis.Core.Util;
 
+using Microsoft.Extensions.Logging;
+
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 namespace Lis.Channels.Telegram;
 
-public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter formatter) : IChannelClient {
+public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter formatter, ILogger<TelegramClient> logger) : IChannelClient {
 
 	[Trace("TelegramClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(
@@ -25,8 +27,8 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 				replyParameters: reply, cancellationToken: ct);
 			return sent.MessageId.ToString();
 		}
-		catch (global::Telegram.Bot.Exceptions.ApiRequestException) {
-			// Malformed markdown — retry as plain text
+		catch (global::Telegram.Bot.Exceptions.ApiRequestException ex) when (ex.ErrorCode == 400) {
+			logger.LogWarning(ex, "MarkdownV2 formatting failed, retrying as plain text");
 			Message sent = await bot.SendMessage(
 				chatId: chatIdNum, text: message,
 				replyParameters: reply, cancellationToken: ct);

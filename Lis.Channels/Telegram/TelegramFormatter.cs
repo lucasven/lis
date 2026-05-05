@@ -11,7 +11,7 @@ namespace Lis.Channels.Telegram;
 /// </summary>
 public sealed partial class TelegramFormatter : IMessageFormatter {
 
-	private const string MustEscape = @"_[]()~`>#+-=|{}.!\";
+	private static readonly HashSet<char> MustEscape = [.. @"_[]()~`>#+-=|{}.!\"];
 
 	// Placeholder tokens (non-printable sequences that won't appear in text)
 	// NOTE: must use \u0002 not \x02 — C# \x escape is greedy and consumes hex chars (A-F)
@@ -22,8 +22,6 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 	private const string PH_ITALIC_CLOSE = "\u0002IC\u0002";
 	private const string PH_STRIKE_OPEN  = "\u0002SO\u0002";
 	private const string PH_STRIKE_CLOSE = "\u0002SC\u0002";
-	private const string PH_UNDER_OPEN   = "\u0002UO\u0002";
-	private const string PH_UNDER_CLOSE  = "\u0002UC\u0002";
 	private const string PH_QUOTE        = "\u0002BQ\u0002";
 
 	[GeneratedRegex(@"```([\s\S]*?)```", RegexOptions.None)]
@@ -117,7 +115,6 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 			.Replace(PH_BOLD_OPEN, "*").Replace(PH_BOLD_CLOSE, "*")
 			.Replace(PH_ITALIC_OPEN, "_").Replace(PH_ITALIC_CLOSE, "_")
 			.Replace(PH_STRIKE_OPEN, "~").Replace(PH_STRIKE_CLOSE, "~")
-			.Replace(PH_UNDER_OPEN, "__").Replace(PH_UNDER_CLOSE, "__")
 			.Replace(PH_QUOTE, ">");
 
 		// Phase 8: restore preserved blocks

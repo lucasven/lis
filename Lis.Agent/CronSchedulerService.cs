@@ -61,7 +61,7 @@ public sealed class CronSchedulerService(
 
 			// Update next run
 			TimeZoneInfo tz = task.Timezone is not null
-				? TimeZoneInfo.FindSystemTimeZoneById(task.Timezone)
+				? TimeZoneHelper.Find(task.Timezone)
 				: TimeZoneInfo.Utc;
 			CronExpression cron = CronExpression.Parse(task.CronExpression, CronFormat.Standard);
 			task.LastRunAt = now;
