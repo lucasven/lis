@@ -78,6 +78,9 @@ public sealed class AgentService(
 	internal bool ShouldRespond(ChatEntity chat, IncomingMessage message, string ownerJid) {
 		if (!chat.Enabled) return false;
 
+		// System-triggered messages (cron, webhooks) are always authorized
+		if (message.SenderId.StartsWith("system:")) return true;
+
 		bool isOwner = !string.IsNullOrEmpty(ownerJid) && message.SenderId == ownerJid;
 
 		// Mention gate applies to everyone (including owner)
