@@ -144,6 +144,7 @@ if (Env("ANTHROPIC_ENABLED") == "true" && hasChannel) {
 	builder.Services.AddScoped<ConversationService>();
 	builder.Services.AddSingleton<IConversationService, MessageDebouncer>();
 	builder.Services.AddLisAgent();
+	builder.Services.AddHostedService<CronSchedulerService>();
 }
 
 WebApplication app = builder.Build();
