@@ -1,5 +1,6 @@
 using Lis.Agent;
 using Lis.Core.Channel;
+using Lis.Core.Configuration;
 using Lis.Persistence;
 using Lis.Persistence.Entities;
 
@@ -50,7 +51,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = false };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner", Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner" });
 
 		Assert.False(result);
 	}
@@ -60,7 +61,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "owner@jid", Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.True(result);
 	}
@@ -76,7 +77,7 @@ public class AgentServiceTests : IDisposable {
 		};
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "allowed@jid", Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.True(result);
 	}
@@ -86,7 +87,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "stranger@jid", Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.False(result);
 	}
@@ -96,7 +97,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true, OpenGroup = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.False(result);
 	}
@@ -106,7 +107,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true, OpenGroup = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, IsBotMentioned = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.True(result);
 	}
@@ -116,7 +117,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.False(result);
 	}
@@ -126,7 +127,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, RequireMention = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "owner@jid", IsGroup = true, IsBotMentioned = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.True(result);
 	}
@@ -136,7 +137,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, OpenGroup = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.True(result);
 	}
@@ -146,7 +147,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true, OpenGroup = true, RequireMention = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.False(result);
 	}
@@ -156,7 +157,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "g1", Enabled = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "g1", SenderId = "stranger", IsGroup = true, Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "owner@jid");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "owner@jid" });
 
 		Assert.False(result);
 	}
@@ -166,7 +167,7 @@ public class AgentServiceTests : IDisposable {
 		ChatEntity chat = new() { ExternalId = "c1", Enabled = true };
 		IncomingMessage msg = new() { ExternalId = "m1", ChatId = "c1", SenderId = "anyone", Channel = "whatsapp" };
 
-		bool result = this._sut.ShouldRespond(chat, msg, "");
+		bool result = this._sut.ShouldRespond(chat, msg, new LisOptions { OwnerJid = "" });
 
 		Assert.False(result);
 	}
