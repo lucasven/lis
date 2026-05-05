@@ -21,6 +21,13 @@ public sealed class MemoryEntity {
 	[JsonPropertyName("content")]
 	public required string Content { get; set; }
 
+	[Column("agent_id")]
+	[JsonPropertyName("agent_id")]
+	public long? AgentId { get; set; }
+
+	[ForeignKey(nameof(AgentId))]
+	public AgentEntity? Agent { get; set; }
+
 	[Column("contact_id")]
 	[JsonPropertyName("contact_id")]
 	public long? ContactId { get; set; }
@@ -40,9 +47,15 @@ public sealed class MemoryEntity {
 	public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public class MemoryEntityConfiguration :IEntityTypeConfiguration<MemoryEntity> {
+public class MemoryEntityConfiguration : IEntityTypeConfiguration<MemoryEntity> {
 	public void Configure(EntityTypeBuilder<MemoryEntity> builder) {
+		builder.HasIndex(e => e.AgentId);
 		builder.HasIndex(e => e.ContactId);
+
+		builder.HasOne(e => e.Agent)
+			   .WithMany()
+			   .HasForeignKey(e => e.AgentId)
+			   .OnDelete(DeleteBehavior.SetNull);
 
 		builder.HasOne(e => e.Contact)
 			   .WithMany(c => c.Memories)
