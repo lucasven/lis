@@ -39,6 +39,12 @@ public sealed class ScheduledTaskEntity {
 	[JsonPropertyName("chat_id")]
 	public required string ChatId { get; set; }
 
+	/// <summary>Sender JID of the user who created this task — used for owner auth on cron-fired prompts.</summary>
+	[MaxLength(128)]
+	[Column("creator_sender_id", TypeName = "varchar(128)")]
+	[JsonPropertyName("creator_sender_id")]
+	public string? CreatorSenderId { get; set; }
+
 	/// <summary>Channel name (whatsapp, telegram, discord, mattermost).</summary>
 	[Required]
 	[MaxLength(32)]

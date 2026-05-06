@@ -85,7 +85,7 @@ public sealed class CronSchedulerService(
 			IncomingMessage synthetic = new() {
 				ExternalId     = $"cron-{task.Id}-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
 				ChatId         = task.ChatId,
-				SenderId       = "system:cron",
+				SenderId       = task.CreatorSenderId ?? "system:cron",
 				SenderName     = $"Cron: {task.Name}",
 				Timestamp      = DateTimeOffset.UtcNow,
 				IsFromMe       = false,

@@ -50,18 +50,19 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 		DateTimeOffset? nextRun = cron.GetNextOccurrence(now, tz);
 
 		ScheduledTaskEntity task = new() {
-			Name           = name,
-			CronExpression = cronExpression,
-			Timezone       = timezone,
-			ChatId         = chatId,
-			Channel        = channel,
-			AgentId        = ToolContext.AgentId,
-			Payload        = payload,
-			Type           = type,
-			Enabled        = true,
-			NextRunAt      = nextRun,
-			CreatedAt      = now,
-			UpdatedAt      = now,
+			Name            = name,
+			CronExpression  = cronExpression,
+			Timezone        = timezone,
+			ChatId          = chatId,
+			Channel         = channel,
+			AgentId         = ToolContext.AgentId,
+			CreatorSenderId = ToolContext.SenderJid,
+			Payload         = payload,
+			Type            = type,
+			Enabled         = true,
+			NextRunAt       = nextRun,
+			CreatedAt       = now,
+			UpdatedAt       = now,
 		};
 
 		db.ScheduledTasks.Add(task);
