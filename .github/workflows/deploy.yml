@@ -19,9 +19,12 @@ jobs:
           dotnet publish Lis.Api/Lis.Api.csproj -c Release -o /home/agenticcompany/lis/publish
 
       - name: Restart service
-        run: sudo systemctl restart lis
+        run: |
+          sudo systemctl stop lis || true
+          sleep 2
+          sudo systemctl start lis
 
       - name: Health check
         run: |
-          sleep 3
-          curl -sf http://localhost:18789/health || (journalctl -u lis --no-pager -n 20 && exit 1)
+          sleep 5
+          curl -sf http://localhost:18789/health || (sudo journalctl -u lis --no-pager -n 30 && exit 1)
