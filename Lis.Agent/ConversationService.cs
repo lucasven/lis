@@ -133,7 +133,7 @@ public sealed class ConversationService(
 
 		IChannelClient channel = channelProvider.Get(message.Channel);
 
-		Activity.Current?.SetTag("gen_ai.system",  "anthropic");
+		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);
 		Activity.Current?.SetTag("session.id",     session.Id.ToString());
 		Activity.Current?.SetTag("agent.name",     agent.DisplayName ?? agent.Name);
 

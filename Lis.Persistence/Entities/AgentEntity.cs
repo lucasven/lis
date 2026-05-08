@@ -32,6 +32,11 @@ public sealed class AgentEntity {
 
 	// Model config
 
+	[MaxLength(32)]
+	[Column("provider", TypeName = "varchar(32)")]
+	[JsonPropertyName("provider")]
+	public string Provider { get; set; } = "anthropic";
+
 	[Required]
 	[MaxLength(128)]
 	[Column("model", TypeName = "varchar(128)")]

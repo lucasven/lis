@@ -1,0 +1,15 @@
+data: {"type":"response.created","response":{"id":"resp_002","object":"response","status":"in_progress"}}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"item_002","type":"function_call","call_id":"call_abc","name":"GetCurrentTime","arguments":"","status":"in_progress"}}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"delta":"{\"timezone\""}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"delta":":\"UTC\"}"}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"arguments":"{\"timezone\":\"UTC\"}"}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"item_002","type":"function_call","call_id":"call_abc","name":"GetCurrentTime","arguments":"{\"timezone\":\"UTC\"}","status":"completed"}}
+
+data: {"type":"response.completed","response":{"id":"resp_002","object":"response","status":"completed","output":[{"id":"item_002","type":"function_call","call_id":"call_abc","name":"GetCurrentTime","arguments":"{\"timezone\":\"UTC\"}","status":"completed"}],"usage":{"input_tokens":50,"output_tokens":20,"total_tokens":70,"input_tokens_details":{"cached_tokens":30}}}}
+
+data: [DONE]

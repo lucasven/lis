@@ -14,6 +14,7 @@ using Lis.Persistence.Entities;
 using Lis.Providers.Anthropic;
 using Lis.Providers.Embedding;
 using Lis.Providers.OpenAi;
+using Lis.Providers.OpenAi.Codex;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -100,8 +101,18 @@ builder.AddNpgsqlDbContext<LisDbContext>("lisdb",
 // Defaults (providers override these)
 builder.Services.AddSingleton(new ModelSettings());
 
-// AI Provider
-if (Env("ANTHROPIC_ENABLED") == "true") builder.Services.AddAnthropic();
+// AI Providers
+if (Env("ANTHROPIC_ENABLED") == "true") {
+	builder.Services.AddAnthropic();
+	builder.Services.AddKeyedSingleton<IChatClient>("anthropic",
+		(sp, _) => sp.GetRequiredService<IChatClient>());
+	builder.Services.AddKeyedSingleton<IUsageExtractor>("anthropic",
+		(sp, _) => sp.GetRequiredService<IUsageExtractor>());
+	builder.Services.AddKeyedSingleton<ITokenCounter>("anthropic",
+		(sp, _) => sp.GetRequiredService<ITokenCounter>());
+}
+
+if (Env("CODEX_ENABLED") == "true") builder.Services.AddCodex();
 
 // Audio transcription (optional — audio messages fall back to placeholder without it)
 if (Env("OPENAI_API_KEY") is { Length: > 0 }) builder.Services.AddOpenAiTranscription();
@@ -140,7 +151,9 @@ bool hasChannel = Env("GOWA_ENABLED") == "true"
               || Env("DISCORD_ENABLED") == "true"
               || Env("MATTERMOST_ENABLED") == "true";
 
-if (Env("ANTHROPIC_ENABLED") == "true" && hasChannel) {
+bool hasProvider = Env("ANTHROPIC_ENABLED") == "true" || Env("CODEX_ENABLED") == "true";
+
+if (hasProvider && hasChannel) {
 	builder.Services.AddScoped<ConversationService>();
 	builder.Services.AddSingleton<IConversationService, MessageDebouncer>();
 	builder.Services.AddLisAgent();

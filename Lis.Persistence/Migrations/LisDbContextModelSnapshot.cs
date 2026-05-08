@@ -107,6 +107,13 @@ namespace Lis.Persistence.Migrations
                         .HasColumnName("name")
                         .HasJsonPropertyName("name");
 
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("provider")
+                        .HasJsonPropertyName("provider");
+
                     b.Property<string>("ThinkingEffort")
                         .HasMaxLength(16)
                         .HasColumnType("varchar(16)")
