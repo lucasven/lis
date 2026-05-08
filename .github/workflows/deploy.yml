@@ -1,4 +1,4 @@
-nname: Deploy Lis
+name: Deploy Lis
 
 on:
   push:
