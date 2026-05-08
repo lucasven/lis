@@ -1,4 +1,4 @@
-name: Deploy Lis
+nname: Deploy Lis
 
 on:
   push:
@@ -20,11 +20,10 @@ jobs:
 
       - name: Restart service
         run: |
-          sudo systemctl stop lis || true
-          sleep 2
-          sudo systemctl start lis
+          nohup bash -c 'sleep 3 && sudo systemctl restart lis' &>/dev/null &
+          echo "Restart scheduled in background"
 
       - name: Health check
         run: |
-          sleep 5
+          sleep 10
           curl -sf http://localhost:3010/health || (sudo journalctl -u lis --no-pager -n 30 && exit 1)
