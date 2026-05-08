@@ -1,0 +1,27 @@
+name: Deploy Lis
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish
+        env:
+          DOTNET_ROOT: /home/agenticcompany/.dotnet
+        run: |
+          export PATH="$DOTNET_ROOT:$PATH"
+          dotnet publish Lis.Api/Lis.Api.csproj -c Release -o /home/agenticcompany/lis/publish
+
+      - name: Restart service
+        run: sudo systemctl restart lis
+
+      - name: Health check
+        run: |
+          sleep 3
+          curl -sf http://localhost:18789/health || (journalctl -u lis --no-pager -n 20 && exit 1)
