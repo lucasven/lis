@@ -48,6 +48,30 @@ public class CodexSseParserTests {
 				"response.created",
 				"response.failed"
 			}
+		},
+		new object[] {
+			"sse-multi-item.txt", new[] {
+				"response.created",
+				"response.output_item.added",
+				"response.reasoning_summary_part.added",
+				"response.reasoning_summary_text.delta",
+				"response.reasoning_summary_part.done",
+				"response.output_item.done",
+				"response.output_item.added",
+				"response.content_part.added",
+				"response.output_text.delta",
+				"response.output_item.done",
+				"response.output_item.added",
+				"response.function_call_arguments.delta",
+				"response.function_call_arguments.done",
+				"response.output_item.done",
+				"response.completed"
+			}
+		},
+		new object[] {
+			"sse-rate-limit.txt", new[] {
+				"error"
+			}
 		}
 	};
 

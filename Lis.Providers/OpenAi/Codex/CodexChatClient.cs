@@ -3,11 +3,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using Lis.Core.Channel;
+
 using Microsoft.Extensions.AI;
 
 namespace Lis.Providers.OpenAi.Codex;
 
-public sealed class CodexChatClient : IChatClient {
+public sealed class CodexChatClient : IChatClient, ISessionAware {
 	private readonly CodexTokenManager       _tokenManager;
 	private readonly CodexOptions            _options;
 	private readonly CodexTransportSelector  _transportSelector;
@@ -219,7 +221,7 @@ public sealed class CodexChatClient : IChatClient {
 
 		return new CodexRequest {
 			Model              = options?.ModelId ?? codexOptions.Model,
-			Instructions       = instructions,
+			Instructions       = instructions ?? "",
 			Input              = input,
 			Tools              = tools,
 			Reasoning          = reasoning,

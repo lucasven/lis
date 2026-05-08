@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Lis.Core.Util;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -14,13 +16,24 @@ public sealed class ModelCommand(IServiceScopeFactory scopeFactory) : IChatComma
 	[Trace("ModelCommand > ExecuteAsync")]
 	public async Task<string> ExecuteAsync(CommandContext ctx, CancellationToken ct) {
 		if (ctx.Args is null or { Length: 0 })
-			return $"🧠 Current model: {ctx.Agent.Model}";
+			return $"🧠 Current model: {ctx.Agent.Model} (provider: {ctx.Agent.Provider})";
 
-		string model = ctx.Args.Trim();
+		string model    = ctx.Args.Trim();
+		string provider = DetectProvider(model) ?? ctx.Agent.Provider;
+
 		ctx.Agent.Model     = model;
+		ctx.Agent.Provider  = provider;
 		ctx.Agent.UpdatedAt = DateTimeOffset.UtcNow;
 		await ctx.Db.SaveChangesAsync(ct);
 
-		return $"✅ Model updated to '{model}'.";
+		return $"✅ Model updated to '{model}' (provider: {provider}).";
+	}
+
+	internal static string? DetectProvider(string model) {
+		if (Regex.IsMatch(model, @"^(claude-|anthropic/)", RegexOptions.IgnoreCase))
+			return "anthropic";
+		if (Regex.IsMatch(model, @"^(gpt-|codex-|o[13]-|o[13]p-|chatgpt-)", RegexOptions.IgnoreCase))
+			return "codex";
+		return null;
 	}
 }

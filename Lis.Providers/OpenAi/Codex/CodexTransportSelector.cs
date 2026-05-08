@@ -151,9 +151,9 @@ public sealed class CodexTransportSelector {
 				await Task.Delay(delay, ct);
 			}
 
-			// Acquire a connected SSE stream (retry loop handles transient failures)
 			Stream? sseStream = null;
 			HttpResponseMessage? response = null;
+			string? fatalError = null;
 			try {
 				HttpRequestMessage req = new(HttpMethod.Post, url);
 				req.Content = new StringContent(body, Encoding.UTF8, "application/json");
@@ -173,12 +173,11 @@ public sealed class CodexTransportSelector {
 						continue;
 					}
 
-					string errorBody = await response.Content.ReadAsStringAsync(ct);
+					fatalError = $"Codex API returned {status}: {await response.Content.ReadAsStringAsync(ct)}";
 					response.Dispose();
-					throw new HttpRequestException($"Codex API returned {status}: {errorBody}");
+				} else {
+					sseStream = await response.Content.ReadAsStreamAsync(ct);
 				}
-
-				sseStream = await response.Content.ReadAsStreamAsync(ct);
 			} catch (HttpRequestException) when (attempt < MaxRetries) {
 				response?.Dispose();
 				continue;
@@ -187,8 +186,10 @@ public sealed class CodexTransportSelector {
 				continue;
 			}
 
-			// Stream events outside try-catch (C# can't yield inside catch)
-			await foreach (JsonElement evt in CodexSseParser.ParseAsync(sseStream, ct))
+			if (fatalError is not null)
+				throw new HttpRequestException(fatalError);
+
+			await foreach (JsonElement evt in CodexSseParser.ParseAsync(sseStream!, ct))
 				yield return evt;
 
 			yield break;

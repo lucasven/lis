@@ -10,7 +10,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace Lis.Agent;
 
-public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService approvalService, IUsageExtractor usageExtractor, ILogger<ToolRunner> logger) {
+public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService approvalService, ILogger<ToolRunner> logger) {
 	internal const string UsageMetadataKey = "LisTokenUsage";
 
 	private static int MaxIterations =>
@@ -20,13 +20,14 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 	public async IAsyncEnumerable<ChatMessageContent> RunAsync(
 		IChatCompletionService chat, ChatHistory history,
 		Kernel kernel, PromptExecutionSettings settings,
+		IUsageExtractor usageExtractor,
 		[EnumeratorCancellation] CancellationToken ct = default) {
 
 		for (int i = 0; i < MaxIterations; i++) {
 			int countBefore = history.Count;
 
 			(ChatMessageContent result, IReadOnlyList<FunctionCallContent> calls, TokenUsage? usage) =
-				await this.StreamResponseAsync(chat, history, settings, kernel, ct);
+				await this.StreamResponseAsync(chat, history, settings, kernel, usageExtractor, ct);
 
 			// SK's ChatClientChatCompletionService auto-appends a tool-call-only message
 			// to ChatHistory when FunctionChoiceBehavior is set (even with autoInvoke: false).
@@ -62,7 +63,8 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 	[Trace("ToolRunner > StreamResponseAsync")]
 	private async Task<(ChatMessageContent, IReadOnlyList<FunctionCallContent>, TokenUsage?)> StreamResponseAsync(
 		IChatCompletionService chat, ChatHistory history,
-		PromptExecutionSettings settings, Kernel kernel, CancellationToken ct) {
+		PromptExecutionSettings settings, Kernel kernel,
+		IUsageExtractor usageExtractor, CancellationToken ct) {
 
 		AuthorRole?                role       = null;
 		StringBuilder              text       = new();

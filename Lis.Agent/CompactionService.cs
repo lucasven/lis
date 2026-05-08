@@ -264,6 +264,8 @@ public sealed class CompactionService(
 			- Ongoing tasks or commitments
 			- Emotional tone and relationship context
 			- Important results from tool usage
+			- Open Questions that were not cleared
+			- Improvement suggestions you may have
 
 			Discard: greetings, repetitive exchanges, raw tool call metadata, verbose tool outputs.
 

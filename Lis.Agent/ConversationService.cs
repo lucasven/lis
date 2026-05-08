@@ -10,6 +10,7 @@ using Lis.Persistence;
 using Lis.Persistence.Entities;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,6 +21,7 @@ namespace Lis.Agent;
 
 public sealed class ConversationService(
 	IServiceScopeFactory         scopeFactory,
+	IServiceProvider             serviceProvider,
 	IChannelClientProvider       channelProvider,
 	Kernel                       kernel,
 	ToolRunner                   toolRunner,
@@ -32,8 +34,7 @@ public sealed class ConversationService(
 	IApprovalService             approvalService,
 	ToolPolicyService            toolPolicyService,
 	IOptions<LisOptions>         lisOptions,
-	ILogger<ConversationService> logger,
-	ITokenCounter?               tokenCounter = null) : IConversationService {
+	ILogger<ConversationService> logger) : IConversationService {
 
 	[Trace("ConversationService > HandleIncomingAsync")]
 	public async Task HandleIncomingAsync(IncomingMessage message, CancellationToken ct) {
@@ -131,6 +132,14 @@ public sealed class ConversationService(
 		ModelSettings  agentModelSettings = AgentService.ToModelSettings(agent);
 		SessionEntity  session            = chat.CurrentSession!;
 
+		// Resolve provider-specific services by agent.Provider key
+		IChatClient      chatClient      = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
+		IUsageExtractor  usageExtractor  = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
+		ITokenCounter?   tokenCounter    = serviceProvider.GetKeyedService<ITokenCounter>(agent.Provider);
+
+		if (chatClient is ISessionAware sessionAware)
+			sessionAware.SessionId = session.Id.ToString();
+
 		IChannelClient channel = channelProvider.Get(message.Channel);
 
 		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);
@@ -216,7 +225,7 @@ public sealed class ConversationService(
 		ToolContext.SenderJid            = message.SenderId;
 		ToolContext.IsOwner              = lisOptions.Value.IsOwner(message.SenderId);
 
-		IChatCompletionService chatService = kernel.GetRequiredService<IChatCompletionService>();
+		IChatCompletionService chatService = chatClient.AsChatCompletionService();
 
 		Dictionary<string, object> extensionData = new() { ["max_tokens"] = agentModelSettings.MaxTokens };
 		if (agentModelSettings.ThinkingEffort is { Length: > 0 } effort)
@@ -250,7 +259,7 @@ public sealed class ConversationService(
 		List<long>  pendingToolMsgIds = new();
 		bool        sentAnyMessage    = false;
 
-		await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, ct)) {
+		await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
 			string? externalId = null;
 			if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content)) {
 				(string? content, bool shouldQuote) = ResponseDirectives.Parse(msg.Content);
