@@ -27,4 +27,4 @@ jobs:
       - name: Health check
         run: |
           sleep 5
-          curl -sf http://localhost:18789/health || (sudo journalctl -u lis --no-pager -n 30 && exit 1)
+          curl -sf http://localhost:3010/health || (sudo journalctl -u lis --no-pager -n 30 && exit 1)
