@@ -152,7 +152,8 @@ public sealed class CodexAuthService {
 		+ "&state=" + state
 		+ "&id_token_add_organizations=true"
 		+ "&codex_cli_simplified_flow=true"
-		+ "&originator=pi";
+		+ "&originator=pi"
+		+ "&prompt=login";
 
 	private static (string Code, string State)? ParseCallbackUrl(string input) {
 		input = input.Trim();
