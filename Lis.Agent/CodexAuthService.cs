@@ -45,6 +45,8 @@ public sealed class CodexAuthService {
 		this._pending[state] = pending;
 
 		string authUrl = BuildAuthUrl(challenge, state);
+		if (this._logger.IsEnabled(LogLevel.Debug))
+			this._logger.LogDebug("Generated Codex auth URL: {Url}", authUrl);
 		return (authUrl, state);
 	}
 
@@ -139,25 +141,18 @@ public sealed class CodexAuthService {
 		return (verifier, challenge);
 	}
 
-	private static string BuildAuthUrl(string challenge, string state) {
-		// Use form-urlencoded style (spaces as +) to match JS URL.searchParams behavior
-		Dictionary<string, string> p = new() {
-			["response_type"]              = "code",
-			["client_id"]                  = ClientId,
-			["redirect_uri"]               = RedirectUri,
-			["scope"]                      = OAuthScope,
-			["code_challenge"]             = challenge,
-			["code_challenge_method"]      = "S256",
-			["state"]                      = state,
-			["id_token_add_organizations"] = "true",
-			["codex_cli_simplified_flow"]  = "true",
-			["originator"]                 = "pi"
-		};
-
-		using FormUrlEncodedContent form = new(p);
-		string query = form.ReadAsStringAsync().GetAwaiter().GetResult();
-		return $"{AuthorizeUrl}?{query}";
-	}
+	private static string BuildAuthUrl(string challenge, string state) =>
+		AuthorizeUrl
+		+ "?response_type=code"
+		+ "&client_id=" + ClientId
+		+ "&redirect_uri=" + Uri.EscapeDataString(RedirectUri)
+		+ "&scope=openid+profile+email+offline_access"
+		+ "&code_challenge=" + challenge
+		+ "&code_challenge_method=S256"
+		+ "&state=" + state
+		+ "&id_token_add_organizations=true"
+		+ "&codex_cli_simplified_flow=true"
+		+ "&originator=pi";
 
 	private static (string Code, string State)? ParseCallbackUrl(string input) {
 		input = input.Trim();

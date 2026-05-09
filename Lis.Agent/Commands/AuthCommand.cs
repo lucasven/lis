@@ -16,7 +16,7 @@ public sealed class AuthCommand(CodexAuthService codexAuthService, ErrorSuppress
 		(string authUrl, _) = codexAuthService.StartAuth(ctx.Message.ChatId, ctx.Agent.Id);
 		errorSuppression.Clear(ctx.Agent.Id);
 
-		string response = $"🔐 Open this link to authenticate with Codex:\n\n{authUrl}\n\nAfter logging in, paste the redirect URL back here.";
+		string response = $"🔐 [Open this link to authenticate with Codex]({authUrl})\n\nAfter logging in, paste the redirect URL back here.";
 		return Task.FromResult(response);
 	}
 }
