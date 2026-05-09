@@ -140,18 +140,23 @@ public sealed class CodexAuthService {
 	}
 
 	private static string BuildAuthUrl(string challenge, string state) {
-		StringBuilder sb = new(AuthorizeUrl);
-		sb.Append("?response_type=code");
-		sb.Append("&client_id="); sb.Append(Uri.EscapeDataString(ClientId));
-		sb.Append("&redirect_uri="); sb.Append(Uri.EscapeDataString(RedirectUri));
-		sb.Append("&scope="); sb.Append(Uri.EscapeDataString(OAuthScope));
-		sb.Append("&code_challenge="); sb.Append(Uri.EscapeDataString(challenge));
-		sb.Append("&code_challenge_method=S256");
-		sb.Append("&state="); sb.Append(Uri.EscapeDataString(state));
-		sb.Append("&id_token_add_organizations=true");
-		sb.Append("&codex_cli_simplified_flow=true");
-		sb.Append("&originator=pi");
-		return sb.ToString();
+		// Use form-urlencoded style (spaces as +) to match JS URL.searchParams behavior
+		Dictionary<string, string> p = new() {
+			["response_type"]              = "code",
+			["client_id"]                  = ClientId,
+			["redirect_uri"]               = RedirectUri,
+			["scope"]                      = OAuthScope,
+			["code_challenge"]             = challenge,
+			["code_challenge_method"]      = "S256",
+			["state"]                      = state,
+			["id_token_add_organizations"] = "true",
+			["codex_cli_simplified_flow"]  = "true",
+			["originator"]                 = "pi"
+		};
+
+		using FormUrlEncodedContent form = new(p);
+		string query = form.ReadAsStringAsync().GetAwaiter().GetResult();
+		return $"{AuthorizeUrl}?{query}";
 	}
 
 	private static (string Code, string State)? ParseCallbackUrl(string input) {
