@@ -150,7 +150,7 @@ public sealed class CodexAuthService {
 		sb.Append("&state="); sb.Append(Uri.EscapeDataString(state));
 		sb.Append("&id_token_add_organizations=true");
 		sb.Append("&codex_cli_simplified_flow=true");
-		sb.Append("&originator=lis");
+		sb.Append("&originator=pi");
 		return sb.ToString();
 	}
 
