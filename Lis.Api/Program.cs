@@ -173,6 +173,18 @@ using (IServiceScope scope = app.Services.CreateScope()) {
 	await agentService.SeedDefaultAsync(db, envModelSettings, lisOpts, CancellationToken.None);
 }
 
+// Wire Codex token persistence and hot-reload callbacks
+if (Env("CODEX_ENABLED") == "true") {
+	CodexTokenManager? tm = app.Services.GetKeyedService<CodexTokenManager>("codex");
+	CodexAuthService? authSvc = app.Services.GetService<CodexAuthService>();
+	if (tm is not null && authSvc is not null) {
+		tm.OnTokensRefreshed = (access, refresh, expiresIn) =>
+			authSvc.PersistTokensAsync(access, refresh, expiresIn);
+		authSvc.OnTokensAcquired = (access, refresh) =>
+			tm.UpdateTokens(access, refresh);
+	}
+}
+
 // Map agent DB IDs → bot registry (for multi-bot Mattermost routing)
 if (app.Services.GetService<MattermostBotRegistry>() is { } botRegistry) {
 	using IServiceScope regScope = app.Services.CreateScope();

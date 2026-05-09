@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Lis.Agent.Commands;
 
-public sealed class ModelCommand(IServiceScopeFactory scopeFactory) : IChatCommand {
+public sealed class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppressionService errorSuppression) : IChatCommand {
 	// Kept for DI consistency; may be used for cross-agent model queries later.
 	private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
 
@@ -25,6 +25,8 @@ public sealed class ModelCommand(IServiceScopeFactory scopeFactory) : IChatComma
 		ctx.Agent.Provider  = provider;
 		ctx.Agent.UpdatedAt = DateTimeOffset.UtcNow;
 		await ctx.Db.SaveChangesAsync(ct);
+
+		errorSuppression.Clear(ctx.Agent.Id);
 
 		return $"✅ Model updated to '{model}' (provider: {provider}).";
 	}

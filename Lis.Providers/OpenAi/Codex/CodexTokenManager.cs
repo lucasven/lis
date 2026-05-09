@@ -21,18 +21,42 @@ public sealed class CodexTokenManager : IDisposable {
 	private Task<CodexTokenInfo>? _refreshTask;
 	private bool _failed;
 
+	public Func<string, string, int, Task>? OnTokensRefreshed { get; set; }
+
 	public CodexTokenManager(CodexOptions options, HttpClient httpClient) {
 		this._options    = options;
 		this._httpClient = httpClient;
 
-		// Parse initial token
-		(string accountId, DateTimeOffset expiresAt) = ParseJwt(options.AccessToken);
-		this._cached = new CodexTokenInfo(options.AccessToken, accountId, expiresAt);
+		// Parse initial token (skip if empty — awaiting OAuth)
+		if (options.AccessToken is { Length: > 0 }) {
+			try {
+				(string accountId, DateTimeOffset expiresAt) = ParseJwt(options.AccessToken);
+				this._cached = new CodexTokenInfo(options.AccessToken, accountId, expiresAt);
+			} catch {
+				// Invalid initial token — will need refresh or OAuth
+			}
+		}
+	}
+
+	public void UpdateTokens(string accessToken, string refreshToken) {
+		this._options.AccessToken  = accessToken;
+		this._options.RefreshToken = refreshToken;
+		this._failed = false;
+
+		try {
+			(string accountId, DateTimeOffset expiresAt) = ParseJwt(accessToken);
+			this._cached = new CodexTokenInfo(accessToken, accountId, expiresAt);
+		} catch {
+			this._cached = null;
+		}
 	}
 
 	public async Task<CodexTokenInfo> GetValidTokenAsync(CancellationToken ct = default) {
 		if (this._failed)
-			throw new CodexAuthException("Codex token refresh previously failed. Re-authenticate to continue.");
+			throw new CodexAuthException("Codex token refresh previously failed. Use /auth codex to re-authenticate.");
+
+		if (this._cached is null && this._options.RefreshToken is not { Length: > 0 })
+			throw new CodexAuthException("Codex is not authenticated. Use /auth codex to log in.");
 
 		CodexTokenInfo? cached = this._cached;
 		if (cached is not null && this.IsValid(cached))
@@ -104,6 +128,10 @@ public sealed class CodexTokenManager : IDisposable {
 			(string accountId, DateTimeOffset expiresAt) = ParseJwt(accessToken);
 			CodexTokenInfo info = new(accessToken, accountId, expiresAt);
 			this._cached = info;
+
+			if (this.OnTokensRefreshed is not null)
+				_ = Task.Run(() => this.OnTokensRefreshed(accessToken, refreshToken, expiresIn.Value), CancellationToken.None);
+
 			return info;
 		} catch (CodexAuthException) {
 			throw;

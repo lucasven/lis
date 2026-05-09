@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -33,6 +34,8 @@ public sealed class ConversationService(
 	IMediaProcessor              mediaProcessor,
 	IApprovalService             approvalService,
 	ToolPolicyService            toolPolicyService,
+	ErrorSuppressionService      errorSuppression,
+	CodexAuthService             codexAuthService,
 	IOptions<LisOptions>         lisOptions,
 	ILogger<ConversationService> logger) : IConversationService {
 
@@ -131,16 +134,40 @@ public sealed class ConversationService(
 		AgentEntity    agent              = await agentService.ResolveForChatAsync(db, chat, ct);
 		ModelSettings  agentModelSettings = AgentService.ToModelSettings(agent);
 		SessionEntity  session            = chat.CurrentSession!;
+		IChannelClient channel            = channelProvider.Get(message.Channel);
+
+		// Intercept OAuth callback URLs pasted into chat
+		if (codexAuthService.IsCallbackUrl(message.Body)) {
+			string? authResult = await codexAuthService.TryCompleteAuthAsync(message.Body!, ct);
+			if (authResult is not null) {
+				errorSuppression.Clear(agent.Id);
+				await channel.SendMessageAsync(message.ChatId, authResult, message.ExternalId, ct);
+				return;
+			}
+		}
 
 		// Resolve provider-specific services by agent.Provider key
-		IChatClient      chatClient      = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
-		IUsageExtractor  usageExtractor  = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
-		ITokenCounter?   tokenCounter    = serviceProvider.GetKeyedService<ITokenCounter>(agent.Provider);
+		IChatClient      chatClient;
+		IUsageExtractor  usageExtractor;
+		ITokenCounter?   tokenCounter;
+		try {
+			chatClient     = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
+			usageExtractor = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
+			tokenCounter   = serviceProvider.GetKeyedService<ITokenCounter>(agent.Provider);
+		} catch (InvalidOperationException ex) {
+			string errorKey = $"provider_not_configured:{agent.Provider}";
+			if (errorSuppression.ShouldNotify(agent.Id, errorKey)) {
+				errorSuppression.Suppress(agent.Id, errorKey);
+				await channel.SendMessageAsync(message.ChatId,
+					$"⚠️ Provider '{agent.Provider}' is not configured. Use /model to switch to an available provider.",
+					message.ExternalId, ct);
+			}
+			Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+			return;
+		}
 
 		if (chatClient is ISessionAware sessionAware)
 			sessionAware.SessionId = session.Id.ToString();
-
-		IChannelClient channel = channelProvider.Get(message.Channel);
 
 		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);
 		Activity.Current?.SetTag("session.id",     session.Id.ToString());
@@ -259,36 +286,51 @@ public sealed class ConversationService(
 		List<long>  pendingToolMsgIds = new();
 		bool        sentAnyMessage    = false;
 
-		await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
-			string? externalId = null;
-			if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content)) {
-				(string? content, bool shouldQuote) = ResponseDirectives.Parse(msg.Content);
-				if (content is not null) {
-					content = await this.DenormalizeMentionsAsync(content, message.ChatId, message.SenderId, ct);
-					externalId = await channel.SendMessageAsync(
-						message.ChatId, content, shouldQuote ? message.ExternalId : null, ct);
-					sentAnyMessage = true;
+		try {
+			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
+				string? externalId = null;
+				if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content)) {
+					(string? content, bool shouldQuote) = ResponseDirectives.Parse(msg.Content);
+					if (content is not null) {
+						content = await this.DenormalizeMentionsAsync(content, message.ChatId, message.SenderId, ct);
+						externalId = await channel.SendMessageAsync(
+							message.ChatId, content, shouldQuote ? message.ExternalId : null, ct);
+						sentAnyMessage = true;
+					}
 				}
+
+				// Usage is attached per-message by ToolRunner (only on assistant messages)
+				TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
+
+				// Back-fill tool result token counts from the API input delta
+				if (msgUsage is not null && prevUsage is not null && pendingToolMsgIds.Count > 0) {
+					int contentOutput = prevUsage.OutputTokens - prevUsage.ThinkingTokens;
+					int delta = msgUsage.TotalInputTokens - prevUsage.TotalInputTokens - contentOutput;
+					if (delta > 0)
+						await BackfillToolTokensAsync(db, pendingToolMsgIds, delta, ct);
+					pendingToolMsgIds.Clear();
+				}
+
+				if (msgUsage is not null) { prevUsage = msgUsage; lastUsage = msgUsage; }
+
+				long entityId = await PersistSkMessageAsync(db, chat, session, msg, msgUsage, externalId, ct);
+
+				if (msg.Role == AuthorRole.Tool)
+					pendingToolMsgIds.Add(entityId);
 			}
-
-			// Usage is attached per-message by ToolRunner (only on assistant messages)
-			TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
-
-			// Back-fill tool result token counts from the API input delta
-			if (msgUsage is not null && prevUsage is not null && pendingToolMsgIds.Count > 0) {
-				int contentOutput = prevUsage.OutputTokens - prevUsage.ThinkingTokens;
-				int delta = msgUsage.TotalInputTokens - prevUsage.TotalInputTokens - contentOutput;
-				if (delta > 0)
-					await BackfillToolTokensAsync(db, pendingToolMsgIds, delta, ct);
-				pendingToolMsgIds.Clear();
+		} catch (Exception ex) when (ex is not OperationCanceledException) {
+			string? errorMsg = this.ClassifyAiError(ex, agent, agentModelSettings);
+			if (errorMsg is not null) {
+				await channel.StopTypingAsync(message.ChatId, ct);
+				string errorKey = errorMsg.GetHashCode().ToString();
+				if (errorSuppression.ShouldNotify(agent.Id, errorKey)) {
+					errorSuppression.Suppress(agent.Id, errorKey);
+					await channel.SendMessageAsync(message.ChatId, errorMsg, message.ExternalId, ct);
+				}
+				Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+				return;
 			}
-
-			if (msgUsage is not null) { prevUsage = msgUsage; lastUsage = msgUsage; }
-
-			long entityId = await PersistSkMessageAsync(db, chat, session, msg, msgUsage, externalId, ct);
-
-			if (msg.Role == AuthorRole.Tool)
-				pendingToolMsgIds.Add(entityId);
+			throw;
 		}
 
 		// Clear typing indicator if no message was sent (NO_RESPONSE)
@@ -543,6 +585,33 @@ public sealed class ConversationService(
 		} catch (Exception ex) {
 			logger.LogWarning(ex, "Failed to process media for {Id}", message.ExternalId);
 		}
+	}
+
+	private string? ClassifyAiError(Exception ex, AgentEntity agent, ModelSettings modelSettings) {
+		string msg = ex.Message;
+
+		// Model not found (Anthropic: "model: X was not found", Codex: similar pattern)
+		if (msg.Contains("not_found", StringComparison.OrdinalIgnoreCase) && msg.Contains("model", StringComparison.OrdinalIgnoreCase)) {
+			// Try to extract the API's suggestion (e.g. "Did you mean claude-opus-4-6?")
+			int didIdx = msg.IndexOf("Did you mean", StringComparison.OrdinalIgnoreCase);
+			string suggestion = didIdx >= 0
+				? msg[didIdx..msg.IndexOf('?', didIdx + 1)] + "?"
+				: "Check the model name and try again with /model.";
+			return $"⚠️ Model '{modelSettings.Model}' was not found. {suggestion}";
+		}
+
+		// Auth failure (Codex provider)
+		if (ex.GetType().Name == "CodexAuthException"
+		    || (ex.InnerException?.GetType().Name == "CodexAuthException")) {
+			return $"🔐 Authentication failed for provider '{agent.Provider}'. Use /auth codex to re-authenticate.";
+		}
+
+		// Generic provider errors that aren't transient
+		if (ex is HttpRequestException { StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden }) {
+			return $"🔐 Authentication error for provider '{agent.Provider}'. Check your API credentials.";
+		}
+
+		return null;
 	}
 
 	private static string Fmt(long tokens) =>

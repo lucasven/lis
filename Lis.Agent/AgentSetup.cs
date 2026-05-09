@@ -50,6 +50,10 @@ public static class AgentSetup {
 		services.AddSingleton<IApprovalService, ApprovalService>();
 		services.AddSingleton<BrowserSessionManager>();
 
+		// Error suppression + OAuth
+		services.AddSingleton<ErrorSuppressionService>();
+		services.AddSingleton<CodexAuthService>();
+
 		// Agent
 		services.AddSingleton<AgentService>();
 
@@ -66,6 +70,7 @@ public static class AgentSetup {
 		services.AddSingleton<IChatCommand, ModelsCommand>();
 		services.AddSingleton<IChatCommand, ApproveCommand>();
 		services.AddSingleton<IChatCommand, DenyCommand>();
+		services.AddSingleton<IChatCommand, AuthCommand>();
 		services.AddSingleton<CommandRouter>();
 
 		// Media
