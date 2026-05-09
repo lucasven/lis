@@ -35,7 +35,6 @@ public sealed class ConversationService(
 	IApprovalService             approvalService,
 	ToolPolicyService            toolPolicyService,
 	ErrorSuppressionService      errorSuppression,
-	CodexAuthService             codexAuthService,
 	IOptions<LisOptions>         lisOptions,
 	ILogger<ConversationService> logger) : IConversationService {
 
@@ -135,16 +134,6 @@ public sealed class ConversationService(
 		ModelSettings  agentModelSettings = AgentService.ToModelSettings(agent);
 		SessionEntity  session            = chat.CurrentSession!;
 		IChannelClient channel            = channelProvider.Get(message.Channel);
-
-		// Intercept OAuth callback URLs pasted into chat
-		if (codexAuthService.IsCallbackUrl(message.Body)) {
-			string? authResult = await codexAuthService.TryCompleteAuthAsync(message.Body!, ct);
-			if (authResult is not null) {
-				errorSuppression.Clear(agent.Id);
-				await channel.SendMessageAsync(message.ChatId, authResult, message.ExternalId, ct);
-				return;
-			}
-		}
 
 		// Resolve provider-specific services by agent.Provider key
 		IChatClient      chatClient;
