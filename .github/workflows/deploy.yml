@@ -17,6 +17,7 @@ jobs:
         run: |
           export PATH="$DOTNET_ROOT:$PATH"
           dotnet publish Lis.Api/Lis.Api.csproj -c Release -o /home/agenticcompany/lis/publish
+          cp -r scripts/ /home/agenticcompany/lis/publish/scripts/
 
       - name: Restart service
         run: |
