@@ -60,7 +60,7 @@ Console.WriteLine("Waiting for callback on http://localhost:1455/auth/callback .
 
 // Start local callback server
 string code = null;
-using HttpListener listener = new();
+var listener = new HttpListener();
 listener.Prefixes.Add("http://localhost:1455/");
 listener.Start();
 
@@ -138,7 +138,7 @@ finally
 Console.WriteLine("✅ Authorization code received. Exchanging for tokens...");
 
 // Exchange code for tokens
-using HttpClient http = new();
+var http = new HttpClient();
 var form = new Dictionary<string, string>
 {
     ["grant_type"] = "authorization_code",
@@ -148,8 +148,8 @@ var form = new Dictionary<string, string>
     ["redirect_uri"] = REDIRECT_URI
 };
 
-using var content = new FormUrlEncodedContent(form);
-using var tokenResp = await http.PostAsync(TOKEN_URL, content);
+var content = new FormUrlEncodedContent(form);
+var tokenResp = await http.PostAsync(TOKEN_URL, content);
 string body = await tokenResp.Content.ReadAsStringAsync();
 
 if (!tokenResp.IsSuccessStatusCode)
