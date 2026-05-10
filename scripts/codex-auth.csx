@@ -19,12 +19,12 @@ const string TOKEN_URL    = "https://auth.openai.com/oauth/token";
 const string REDIRECT_URI = "http://localhost:1455/auth/callback";
 const string SCOPE        = "openid profile email offline_access";
 
-// Parse --output flag
+// Default output: current working directory. Use --output to override.
 string outputPath = Path.Combine(Directory.GetCurrentDirectory(), "auth.json");
 for (int i = 0; i < Args.Count; i++)
 {
     if (Args[i] is "--output" or "-o" && i + 1 < Args.Count)
-        outputPath = Args[i + 1];
+        outputPath = Path.GetFullPath(Args[i + 1]);
 }
 
 // Generate PKCE
@@ -204,7 +204,9 @@ Console.WriteLine($"   Account: {accountId}");
 Console.WriteLine($"   Expires: {expiresIn}s");
 Console.WriteLine($"   Saved:   {outputPath}");
 Console.WriteLine();
-Console.WriteLine("Copy auth.json to your Lis deployment directory if running remotely.");
+Console.WriteLine("Next steps:");
+Console.WriteLine("  1. Ensure auth.json is in the Lis publish directory (where Lis.Api.dll lives)");
+Console.WriteLine("  2. Restart the service:  sudo systemctl restart lis");
 
 return 0;
 
