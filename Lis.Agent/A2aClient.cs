@@ -1,0 +1,135 @@
+using System.Text;
+using System.Text.Json;
+
+using Lis.Core.A2A;
+using Lis.Core.Configuration;
+using Lis.Core.Util;
+using Lis.Persistence;
+using Lis.Persistence.Entities;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace Lis.Agent;
+
+public sealed class A2aClient(
+	IServiceScopeFactory scopeFactory,
+	IServiceProvider     serviceProvider,
+	PromptComposer       promptComposer,
+	ILogger<A2aClient>   logger) : IA2aClient {
+
+	private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+	[Trace("A2aClient > SendMessageAsync")]
+	public async Task<A2aTask> SendMessageAsync(string targetAgent, A2aMessage message, CancellationToken ct = default) {
+		if (message.Parts is not { Count: > 0 })
+			throw new InvalidOperationException("Message must contain at least one part.");
+
+		using IServiceScope scope = scopeFactory.CreateScope();
+		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+
+		AgentEntity? agent = await db.Agents.FirstOrDefaultAsync(a => a.Name == targetAgent, ct);
+		if (agent is null)
+			throw new KeyNotFoundException($"Agent '{targetAgent}' not found.");
+
+		string contextId = message.ContextId ?? Guid.NewGuid().ToString();
+		string taskId    = Guid.NewGuid().ToString();
+
+		try {
+			string systemPrompt = await promptComposer.BuildAsync(db, agent.Id, ct);
+
+			IChatClient chatClient = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
+			IChatCompletionService chatService = chatClient.AsChatCompletionService();
+
+			ChatHistory history = [];
+			if (!string.IsNullOrWhiteSpace(systemPrompt))
+				history.AddSystemMessage(systemPrompt);
+			history.AddUserMessage(BuildUserContent(message));
+
+			ModelSettings modelSettings = AgentService.ToModelSettings(agent);
+
+			Dictionary<string, object> extensionData = new() { ["max_tokens"] = modelSettings.MaxTokens };
+			if (modelSettings.ThinkingEffort is { Length: > 0 } effort)
+				extensionData["thinking"] = new Dictionary<string, object> {
+					["type"]          = "enabled",
+					["budget_tokens"] = effort switch {
+						"low"    => 1024,
+						"medium" => 4096,
+						"high"   => 16384,
+						_        => int.TryParse(effort, out int t) ? t : 4096
+					}
+				};
+
+			PromptExecutionSettings settings = new() {
+				ModelId       = modelSettings.Model,
+				ExtensionData = extensionData,
+			};
+
+			IReadOnlyList<ChatMessageContent> results =
+				await chatService.GetChatMessageContentsAsync(history, settings, kernel: null, ct);
+
+			List<Part> responseParts = [];
+			foreach (ChatMessageContent result in results) {
+				if (!string.IsNullOrWhiteSpace(result.Content))
+					responseParts.Add(new TextPart { Text = result.Content });
+			}
+
+			if (responseParts.Count == 0)
+				responseParts.Add(new TextPart { Text = "(no response)" });
+
+			return new A2aTask {
+				Id        = taskId,
+				ContextId = contextId,
+				Status = new A2aTaskStatus {
+					State     = A2aTaskState.Completed,
+					Timestamp = DateTimeOffset.UtcNow,
+				},
+				Artifacts = [
+					new A2aArtifact {
+						ArtifactId = Guid.NewGuid().ToString(),
+						Parts      = responseParts,
+					}
+				],
+			};
+		} catch (Exception ex) when (ex is not OperationCanceledException and not KeyNotFoundException and not InvalidOperationException) {
+			logger.LogError(ex, "A2A call to agent '{Agent}' failed", targetAgent);
+
+			return new A2aTask {
+				Id        = taskId,
+				ContextId = contextId,
+				Status = new A2aTaskStatus {
+					State   = A2aTaskState.Failed,
+					Message = new A2aMessage {
+						MessageId = Guid.NewGuid().ToString(),
+						Role      = "agent",
+						Parts     = [new TextPart { Text = ex.Message }],
+					},
+					Timestamp = DateTimeOffset.UtcNow,
+				},
+			};
+		}
+	}
+
+	private static string BuildUserContent(A2aMessage message) {
+		StringBuilder sb = new();
+
+		foreach (Part part in message.Parts) {
+			if (sb.Length > 0) sb.Append("\n\n");
+
+			switch (part) {
+				case TextPart text:
+					sb.Append(text.Text);
+					break;
+				case DataPart data:
+					sb.Append(JsonSerializer.Serialize(data.Data, JsonOptions));
+					break;
+			}
+		}
+
+		return sb.ToString();
+	}
+}

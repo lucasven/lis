@@ -1,4 +1,5 @@
 using Lis.Agent.Commands;
+using Lis.Core.A2A;
 using Lis.Tools;
 using Lis.Tools.Browser;
 
@@ -36,6 +37,7 @@ public static class AgentSetup {
 			kernel.Plugins.AddFromType<WebPlugin>(pluginName: "web", serviceProvider: sp);
 			kernel.Plugins.AddFromType<BrowserPlugin>(pluginName: "browser", serviceProvider: sp);
 			kernel.Plugins.AddFromType<CronPlugin>(pluginName: "cron", serviceProvider: sp);
+			kernel.Plugins.AddFromType<A2aPlugin>(pluginName: "a2a", serviceProvider: sp);
 
 			// Build auth registry from plugin metadata
 			ToolAuthRegistry authRegistry = sp.GetRequiredService<ToolAuthRegistry>();
@@ -43,6 +45,10 @@ public static class AgentSetup {
 
 			return kernel;
 		});
+
+		// A2A (agent-to-agent)
+		services.AddSingleton<IAgentCardProvider, A2aCardProvider>();
+		services.AddSingleton<IA2aClient, A2aClient>();
 
 		// Tool authorization, policy, and approvals
 		services.AddSingleton<ToolAuthRegistry>();

@@ -45,6 +45,11 @@ public sealed class PromptSectionEntity {
 	[JsonPropertyName("updated_at")]
 	public DateTimeOffset UpdatedAt { get; set; }
 
+	[MaxLength(256)]
+	[Column("tags", TypeName = "varchar(256)")]
+	[JsonPropertyName("tags")]
+	public string? Tags { get; set; }
+
 	public AgentEntity Agent { get; set; } = null!;
 }
 
