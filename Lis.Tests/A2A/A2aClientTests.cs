@@ -108,6 +108,30 @@ public sealed class A2aClientTests : IDisposable {
 	}
 
 	[Fact]
+	public async Task SendMessage_ResponseContainsDataPart() {
+		string json = """{"slots": [{"time": "Mon 10:00"}, {"time": "Tue 14:00"}, {"time": "Wed 09:00"}]}""";
+		var client = this.CreateClient("planner", json);
+
+		A2aMessage message = new() {
+			MessageId = "test-msg-006",
+			Role      = "user",
+			Parts     = [new TextPart { Text = "Find three available 30-minute slots this week for a team sync." }],
+		};
+
+		A2aTask task = await client.SendMessageAsync("scheduler", message);
+
+		Assert.Equal(A2aTaskState.Completed, task.Status.State);
+		Assert.NotNull(task.Artifacts);
+		Assert.NotEmpty(task.Artifacts);
+
+		List<Part> parts = task.Artifacts[0].Parts.ToList();
+		Assert.Contains(parts, p => p is DataPart);
+
+		DataPart dataPart = Assert.IsType<DataPart>(parts.First(p => p is DataPart));
+		Assert.True(dataPart.Data.ContainsKey("slots"));
+	}
+
+	[Fact]
 	public async Task SendMessage_NonExistentAgent_ThrowsKeyNotFound() {
 		var client = this.CreateClient("lis", "");
 

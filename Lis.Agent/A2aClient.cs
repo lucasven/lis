@@ -74,8 +74,12 @@ public sealed class A2aClient(
 
 			List<Part> responseParts = [];
 			foreach (ChatMessageContent result in results) {
-				if (!string.IsNullOrWhiteSpace(result.Content))
-					responseParts.Add(new TextPart { Text = result.Content });
+				if (string.IsNullOrWhiteSpace(result.Content)) continue;
+
+				responseParts.Add(new TextPart { Text = result.Content });
+
+				if (TryParseJsonData(result.Content, out Dictionary<string, object>? data))
+					responseParts.Add(new DataPart { Data = data });
 			}
 
 			if (responseParts.Count == 0)
@@ -111,6 +115,19 @@ public sealed class A2aClient(
 					Timestamp = DateTimeOffset.UtcNow,
 				},
 			};
+		}
+	}
+
+	private static bool TryParseJsonData(string content, out Dictionary<string, object> data) {
+		data = null!;
+		string trimmed = content.Trim();
+		if (!trimmed.StartsWith('{') || !trimmed.EndsWith('}')) return false;
+
+		try {
+			data = JsonSerializer.Deserialize<Dictionary<string, object>>(trimmed, JsonOptions)!;
+			return data is not null;
+		} catch {
+			return false;
 		}
 	}
 
