@@ -24,8 +24,8 @@ public sealed record SkillParseResult {
 public static partial class SkillParser {
 
 	private const int MaxNameLength        = 50;
-	private const int MaxDescriptionLength = 200;
-	private const int MaxContentLength     = 20_000;
+	private const int MaxDescriptionLength = 500;
+	private const int MaxContentLength     = 100_000;
 
 	private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
 		.WithNamingConvention(UnderscoredNamingConvention.Instance)

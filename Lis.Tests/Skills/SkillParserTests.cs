@@ -84,12 +84,12 @@ public class SkillParserTests {
 
 	[Fact]
 	public void Parse_OversizedContent_ReturnsError() {
-		string content = new('x', 20_001);
+		string content = new('x', 100_001);
 		string input   = $"---\nname: big-skill\ndescription: Too large\n---\n\n{content}";
 
 		SkillParseResult result = SkillParser.TryParse(input);
 
 		Assert.False(result.IsSuccess);
-		Assert.Contains("20,000", result.Error);
+		Assert.Contains("100,000", result.Error);
 	}
 }
