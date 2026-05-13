@@ -4,6 +4,7 @@ using Lis.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
 
@@ -12,9 +13,10 @@ using Pgvector;
 namespace Lis.Persistence.Migrations
 {
     [DbContext(typeof(LisDbContext))]
-    partial class LisDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513170100_add_skill_assets_path")]
+    partial class add_skill_assets_path
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
