@@ -21,8 +21,8 @@ public sealed class SkillEntity {
 	public required string Name { get; set; }
 
 	[Required]
-	[MaxLength(200)]
-	[Column("description", TypeName = "varchar(200)")]
+	[MaxLength(500)]
+	[Column("description", TypeName = "varchar(500)")]
 	[JsonPropertyName("description")]
 	public required string Description { get; set; }
 
@@ -30,6 +30,11 @@ public sealed class SkillEntity {
 	[Column("content")]
 	[JsonPropertyName("content")]
 	public required string Content { get; set; }
+
+	[MaxLength(1024)]
+	[Column("assets_path", TypeName = "varchar(1024)")]
+	[JsonPropertyName("assets_path")]
+	public string? AssetsPath { get; set; }
 
 	[Column("version")]
 	[JsonPropertyName("version")]

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text;
 
 using Lis.Core.Util;
@@ -22,23 +23,56 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 		[Description("URL of the skill file")] string url) {
 		await ToolContext.NotifyAsync($"📦 Installing skill from {url}");
 
-		if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
-			|| (uri.Scheme != "http" && uri.Scheme != "https"))
-			return "Invalid URL — only HTTP and HTTPS URLs are supported.";
+		// Resolve workspace path for asset storage
+		long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		using IServiceScope scope = scopeFactory.CreateScope();
+		LisDbContext db         = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		AgentEntity? agent         = await db.Agents.FindAsync(agentId);
+		string workspacePath       = agent?.WorkspacePath ?? Directory.GetCurrentDirectory();
 
+		// Determine source type and resolve skill content
 		string body;
-		try {
-			using CancellationTokenSource cts    = new(TimeSpan.FromSeconds(10));
-			using HttpClient              client = httpClientFactory.CreateClient();
-			using HttpResponseMessage     resp   = await client.GetAsync(uri, cts.Token);
-			resp.EnsureSuccessStatusCode();
-			body = await resp.Content.ReadAsStringAsync(cts.Token);
+		string? sourceRef = url;
+		string? assetsDir = null;
+
+		if (IsGitHubRepoUrl(url)) {
+			// GitHub repo URL — clone and find SKILL.md
+			(body, assetsDir) = await CloneAndResolveSkillAsync(url);
 		}
-		catch (TaskCanceledException) {
-			return "Request timed out after 10 seconds.";
+		else if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+				 && (uri.Scheme == "http" || uri.Scheme == "https")) {
+			// Direct URL — fetch content
+			try {
+				using CancellationTokenSource cts    = new(TimeSpan.FromSeconds(10));
+				using HttpClient            client = httpClientFactory.CreateClient();
+				using HttpResponseMessage     resp   = await client.GetAsync(uri, cts.Token);
+				resp.EnsureSuccessStatusCode();
+				body = await resp.Content.ReadAsStringAsync(cts.Token);
+			}
+			catch (TaskCanceledException) {
+				return "Request timed out after 10 seconds.";
+			}
+			catch (HttpRequestException ex) {
+				return $"Failed to fetch skill: {ex.Message}";
+			}
 		}
-		catch (HttpRequestException ex) {
-			return $"Failed to fetch skill: {ex.Message}";
+		else if (File.Exists(url)) {
+			// Local file path
+			body = await File.ReadAllTextAsync(url);
+			string? parentDir = Path.GetDirectoryName(Path.GetFullPath(url));
+			if (parentDir is not null && HasAssets(parentDir))
+				assetsDir = parentDir;
+		}
+		else if (Directory.Exists(url)) {
+			// Local directory — find SKILL.md inside
+			string? skillFile = FindSkillFile(url);
+			if (skillFile is null)
+				return $"No SKILL.md found in '{url}' or its .claude/skills/ subdirectories.";
+			body = await File.ReadAllTextAsync(skillFile);
+			assetsDir = Path.GetDirectoryName(skillFile);
+		}
+		else {
+			return "Source not found — provide a URL (HTTP/HTTPS/GitHub repo) or a local file/directory path.";
 		}
 
 		SkillParseResult result = SkillParser.TryParse(body);
@@ -47,9 +81,12 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 
 		ParsedSkill parsed = result.Skill!;
 
-		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		// Copy assets to workspace if present
+		string? installedAssetsPath = null;
+		if (assetsDir is not null) {
+			installedAssetsPath = Path.Combine(workspacePath, "skills", parsed.Name);
+			CopyAssets(assetsDir, installedAssetsPath);
+		}
 
 		SkillEntity? existing = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == parsed.Name);
@@ -58,25 +95,29 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 			existing.Description = parsed.Description;
 			existing.Content     = parsed.Content;
 			existing.Version     = parsed.Version;
-			existing.SourceUrl   = url;
-			existing.UpdatedAt   = DateTimeOffset.UtcNow;
+			existing.SourceUrl   = sourceRef;
+			existing.AssetsPath  = installedAssetsPath;
+			existing.UpdatedAt = DateTimeOffset.UtcNow;
 			await db.SaveChangesAsync();
-			return $"Skill '{parsed.Name}' updated.";
+			return $"Skill '{parsed.Name}' updated."
+				 + (installedAssetsPath is not null ? $" Assets at {installedAssetsPath}" : "");
 		}
 
 		db.Skills.Add(new SkillEntity {
-			Name        = parsed.Name,
+			Name   = parsed.Name,
 			Description = parsed.Description,
 			Content     = parsed.Content,
 			Version     = parsed.Version,
-			SourceUrl   = url,
+			SourceUrl   = sourceRef,
+			AssetsPath  = installedAssetsPath,
 			IsEnabled   = true,
 			AgentId     = agentId,
 			CreatedAt   = DateTimeOffset.UtcNow,
 			UpdatedAt   = DateTimeOffset.UtcNow,
 		});
 		await db.SaveChangesAsync();
-		return $"Skill '{parsed.Name}' installed.";
+		return $"Skill '{parsed.Name}' installed."
+			 + (installedAssetsPath is not null ? $" Assets at {installedAssetsPath}" : "");
 	}
 
 	[KernelFunction("list")]
@@ -87,8 +128,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> ListAsync(
 		[Description("Agent name (owner only, defaults to current)")] string? agent = null) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = await ResolveAgentIdAsync(db, agent);
+		LisDbContext db  = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId   = await ResolveAgentIdAsync(db, agent);
 
 		List<SkillEntity> skills = await db.Skills
 			.Where(s => s.AgentId == agentId)
@@ -114,14 +155,18 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> UninstallAsync(
 		[Description("Skill name to remove")] string name) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		LisDbContext db    = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId        = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 
 		SkillEntity? skill = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == name);
 
 		if (skill is null)
 			return $"Skill '{name}' not found.";
+
+		// Remove assets from workspace
+		if (skill.AssetsPath is not null && Directory.Exists(skill.AssetsPath))
+			Directory.Delete(skill.AssetsPath, true);
 
 		db.Skills.Remove(skill);
 		await db.SaveChangesAsync();
@@ -136,8 +181,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> EnableAsync(
 		[Description("Skill name")] string name) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		LisDbContext db       = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId      = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 
 		SkillEntity? skill = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == name);
@@ -159,8 +204,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> DisableAsync(
 		[Description("Skill name")] string name) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		LisDbContext db   = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId         = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 
 		SkillEntity? skill = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == name);
@@ -182,8 +227,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> GetAsync(
 		[Description("Skill name")] string name) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		LisDbContext db         = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId   = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 
 		SkillEntity? skill = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == name);
@@ -199,6 +244,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 		sb.AppendLine($"Status: {status}");
 		if (skill.SourceUrl is not null)
 			sb.AppendLine($"Source: {skill.SourceUrl}");
+		if (skill.AssetsPath is not null)
+			sb.AppendLine($"Assets: {skill.AssetsPath}");
 		sb.AppendLine($"Content length: {skill.Content.Length} chars");
 		return sb.ToString().TrimEnd();
 	}
@@ -211,8 +258,8 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	public async Task<string> UseAsync(
 		[Description("Skill name to activate")] string name) {
 		using IServiceScope scope = scopeFactory.CreateScope();
-		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
-		long agentId               = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+		LisDbContext db      = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		long agentId       = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 
 		SkillEntity? skill = await db.Skills
 			.FirstOrDefaultAsync(s => s.AgentId == agentId && s.Name == name);
@@ -224,6 +271,122 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 			return $"Skill '{name}' is disabled. Enable it first.";
 
 		return skill.Content;
+	}
+
+	// --- Private helpers ---
+
+	private static bool IsGitHubRepoUrl(string url) =>
+		url.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase)
+		&& !url.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+		&& !url.Contains("/raw/", StringComparison.OrdinalIgnoreCase);
+
+	private static async Task<(string Content, string? AssetsDir)> CloneAndResolveSkillAsync(string repoUrl) {
+		string cleanUrl = repoUrl;
+		int treeIdx = repoUrl.IndexOf("/tree/", StringComparison.OrdinalIgnoreCase);
+		if (treeIdx > 0)
+			cleanUrl = repoUrl[..treeIdx] + ".git";
+		else if (!repoUrl.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+			cleanUrl = repoUrl + ".git";
+
+		string tempDir = Path.Combine(Path.GetTempPath(), $"lis-skill-{Guid.NewGuid():N}");
+		try {
+			using Process git = new() {
+				StartInfo = new ProcessStartInfo {
+					FileName      = "git",
+					Arguments   = $"clone --depth 1 {cleanUrl} {tempDir}",
+					RedirectStandardOutput = true,
+					RedirectStandardError  = true,
+					UseShellExecute        = false,
+				}
+			};
+			git.Start();
+			await git.WaitForExitAsync();
+			if (git.ExitCode != 0) {
+				string stderr = await git.StandardError.ReadToEndAsync();
+				throw new InvalidOperationException($"git clone failed: {stderr}");
+			}
+
+			string? skillFile = FindSkillFile(tempDir)
+				?? throw new FileNotFoundException("No SKILL.md found in cloned repository.");
+
+			string content   = await File.ReadAllTextAsync(skillFile);
+			string? assetDir = Path.GetDirectoryName(skillFile);
+
+			if (assetDir is not null)
+				ResolveSymlinks(assetDir, tempDir);
+
+			return (content, assetDir);
+		}
+		catch {
+			if (Directory.Exists(tempDir))
+				Directory.Delete(tempDir, true);
+			throw;
+		}
+	}
+
+	private static string? FindSkillFile(string rootDir) {
+		string direct = Path.Combine(rootDir, "SKILL.md");
+		if (File.Exists(direct))
+			return direct;
+
+		string claudeSkillsDir = Path.Combine(rootDir, ".claude", "skills");
+		if (Directory.Exists(claudeSkillsDir)) {
+			foreach (string dir in Directory.GetDirectories(claudeSkillsDir)) {
+				string candidate = Path.Combine(dir, "SKILL.md");
+				if (File.Exists(candidate))
+					return candidate;
+			}
+		}
+
+		return null;
+	}
+
+	private static bool HasAssets(string dir) {
+		string[] entries = Directory.GetFileSystemEntries(dir);
+		return entries.Length > 1
+			   || (entries.Length == 1
+				   && !entries[0].EndsWith("SKILL.md", StringComparison.OrdinalIgnoreCase));
+	}
+
+	private static void ResolveSymlinks(string dir, string repoRoot) {
+		foreach (string entry in Directory.GetFileSystemEntries(dir)) {
+			FileSystemInfo info = File.Exists(entry)
+				? new FileInfo(entry)
+				: new DirectoryInfo(entry);
+
+			if (info.LinkTarget is null) continue;
+
+			string targetPath = Path.GetFullPath(info.LinkTarget, dir);
+			if (!targetPath.StartsWith(repoRoot)) continue;
+
+			if (info is FileInfo) {
+				File.Delete(entry);
+				if (File.Exists(targetPath))
+					File.Copy(targetPath, entry);
+			}
+			else {
+				Directory.Delete(entry);
+				if (Directory.Exists(targetPath))
+					CopyDirectory(targetPath, entry);
+			}
+		}
+	}
+
+	private static void CopyAssets(string sourceDir, string targetDir) {
+		if (Directory.Exists(targetDir))
+			Directory.Delete(targetDir, true);
+		CopyDirectory(sourceDir, targetDir);
+	}
+
+	private static void CopyDirectory(string source, string destination) {
+		Directory.CreateDirectory(destination);
+		foreach (string file in Directory.GetFiles(source))
+			File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+		foreach (string dir in Directory.GetDirectories(source)) {
+			string dirName = Path.GetFileName(dir);
+			if (dirName is ".git") continue;
+			CopyDirectory(dir, Path.Combine(destination, dirName));
+		}
 	}
 
 	private static async Task<long> ResolveAgentIdAsync(LisDbContext db, string? agent) {
