@@ -38,6 +38,7 @@ public static class AgentSetup {
 			kernel.Plugins.AddFromType<BrowserPlugin>(pluginName: "browser", serviceProvider: sp);
 			kernel.Plugins.AddFromType<CronPlugin>(pluginName: "cron", serviceProvider: sp);
 			kernel.Plugins.AddFromType<A2aPlugin>(pluginName: "a2a", serviceProvider: sp);
+			kernel.Plugins.AddFromType<SkillPlugin>(pluginName: "skill", serviceProvider: sp);
 
 			// Build auth registry from plugin metadata
 			ToolAuthRegistry authRegistry = sp.GetRequiredService<ToolAuthRegistry>();

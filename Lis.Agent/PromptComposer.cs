@@ -60,6 +60,18 @@ public sealed class PromptComposer(
 			sb.Append(content);
 		}
 
+		List<SkillEntity> skills = await db.Skills
+			.Where(s => s.IsEnabled && s.AgentId == agentId)
+			.OrderBy(s => s.Name)
+			.ToListAsync(ct);
+
+		if (skills.Count > 0) {
+			StringBuilder skillSb = new("\n\nInstalled Skills:");
+			foreach (SkillEntity skill in skills)
+				skillSb.Append($"\n- {skill.Name}: {skill.Description}");
+			sb.Append(skillSb);
+		}
+
 		List<MemoryEntity> memories = await db.Memories
 			.Include(m => m.Contact)
 			.OrderByDescending(m => m.CreatedAt)

@@ -130,6 +130,7 @@ public sealed class AgentEntity {
 	public DateTimeOffset UpdatedAt { get; set; }
 
 	public ICollection<PromptSectionEntity> PromptSections { get; set; } = [];
+	public ICollection<SkillEntity> Skills { get; set; } = [];
 }
 
 public class AgentEntityConfiguration : IEntityTypeConfiguration<AgentEntity> {
