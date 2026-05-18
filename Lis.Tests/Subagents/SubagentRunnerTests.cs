@@ -325,13 +325,14 @@ public sealed class SubagentRunnerTests : IDisposable {
 		services.AddKeyedSingleton<IChatClient>("openai", openaiClient);
 		services.AddKeyedSingleton<IUsageExtractor>("anthropic", new FakeUsageExtractor());
 		services.AddKeyedSingleton<IUsageExtractor>("openai", new FakeUsageExtractor());
-		ServiceProvider sp = services.BuildServiceProvider();
-
 		// Build kernel with DateTimePlugin (for tool inheritance test)
 		IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
 		kernelBuilder.Services.AddSingleton<IChatCompletionService>(anthropicClient.AsChatCompletionService());
 		Kernel kernel = kernelBuilder.Build();
 		kernel.Plugins.AddFromType<DateTimePlugin>(pluginName: "dt");
+
+		services.AddSingleton(kernel);
+		ServiceProvider sp = services.BuildServiceProvider();
 
 		ToolAuthRegistry authRegistry = new();
 		authRegistry.Build(kernel);
@@ -346,7 +347,7 @@ public sealed class SubagentRunnerTests : IDisposable {
 
 		return new SubagentRunner(
 			sp.GetRequiredService<IServiceScopeFactory>(),
-			sp, kernel, toolRunner, toolPolicyService, promptComposer,
+			sp, toolRunner, toolPolicyService, promptComposer,
 			NullLogger<SubagentRunner>.Instance);
 	}
 

@@ -17,7 +17,6 @@ namespace Lis.Agent;
 public sealed class SubagentRunner(
 	IServiceScopeFactory scopeFactory,
 	IServiceProvider     serviceProvider,
-	Kernel               kernel,
 	ToolRunner           toolRunner,
 	ToolPolicyService    toolPolicyService,
 	PromptComposer       promptComposer,
@@ -75,7 +74,7 @@ public sealed class SubagentRunner(
 			history.AddSystemMessage(systemPrompt);
 		history.AddUserMessage(request.Task);
 
-		Kernel agentKernel = kernel.Clone();
+		Kernel agentKernel = serviceProvider.GetRequiredService<Kernel>().Clone();
 		HashSet<string> allowedPlugins = toolPolicyService.GetAllowedPluginNames(agent);
 		foreach (KernelPlugin plugin in agentKernel.Plugins.ToList())
 			if (!allowedPlugins.Contains(plugin.Name))
