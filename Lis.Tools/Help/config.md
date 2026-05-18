@@ -11,7 +11,7 @@ Read an agent's configuration fields.
 
 ### cfg-update_agent_config(key, value, agent?)
 Update a single configuration field on an agent.
-- `key` (string): One of: `model`, `max_tokens`, `context_budget`, `thinking_effort`, `tool_notifications`, `compaction_threshold`, `keep_recent_tokens`, `tool_prune_threshold`, `tool_keep_threshold`, `tool_summarization_policy`, `display_name`, `mention_triggers`.
+- `key` (string): One of: `model`, `max_tokens`, `context_budget`, `thinking_effort`, `tool_notifications`, `compaction_threshold`, `keep_recent_tokens`, `tool_prune_threshold`, `tool_keep_threshold`, `tool_summarization_policy`, `display_name`, `mention_triggers`, `group_context_prompt`, `tool_profile`, `tools_allow`, `tools_deny`, `workspace_path`, `exec_security`, `exec_timeout_seconds`.
 - `value` (string): The new value. Type depends on the key (string, int, or bool).
 - `agent` (string, optional): Target agent. Defaults to current agent.
 

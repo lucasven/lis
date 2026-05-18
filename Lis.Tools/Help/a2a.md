@@ -12,9 +12,9 @@ List all available agents with name, description, and skill list.
 Get detailed information about a specific agent.
 - `name` (string): Agent name as returned by a2a-list_agents.
 
-### a2a-send(agent, message)
+### a2a-send(targetAgent, message)
 Send a message to another agent and receive their response.
-- `agent` (string): Target agent name.
+- `targetAgent` (string): Target agent name.
 - `message` (string): The task or question to send. Be specific — the target agent has no context from this conversation.
 
 The target agent processes the message independently with its own tools and system prompt. Returns the agent's text response.
@@ -23,7 +23,7 @@ The target agent processes the message independently with its own tools and syst
 
 1. `a2a-list_agents()` — discover available agents and what they can do
 2. `a2a-get_agent(name="agent-name")` — (optional) get full details if needed
-3. `a2a-send(agent="agent-name", message="Do X with Y")` — delegate the task
+3. `a2a-send(targetAgent="agent-name", message="Do X with Y")` — delegate the task
 
 ## Common Errors
 

@@ -12,11 +12,12 @@ List all prompt sections.
 Get the full content of a specific section.
 - `name` (string): Exact section name from prompt-list_prompt_sections.
 
-### prompt-update_prompt_section(name, content, description?)
+### prompt-update_prompt_section(name, content, agent?, sortOrder?)
 Create or update a prompt section.
 - `name` (string): Section name. Creates it if it doesn't exist.
 - `content` (string): Markdown text for the section body.
-- `description` (string, optional): Short description of what this section does.
+- `agent` (string, optional): Agent name. Defaults to current agent.
+- `sortOrder` (int, optional): Sort order (lower = earlier in prompt). Auto-appends if omitted on create.
 - Changes take effect on the next message (not the current one).
 
 ## Workflow
@@ -27,7 +28,7 @@ Create or update a prompt section.
 
 **Add a new instruction:**
 1. `prompt-list_prompt_sections(type="names")` — check existing sections
-2. `prompt-update_prompt_section(name="coding-style", content="Always use TypeScript...", description="Code style preferences")`
+2. `prompt-update_prompt_section(name="coding-style", content="Always use TypeScript...")`
 
 ## Common Errors
 

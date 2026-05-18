@@ -21,9 +21,10 @@ Find and replace text in a file.
 - `old_text` (string): Exact text to find (first occurrence only).
 - `new_text` (string): Replacement text.
 
-### fs-list_directory(path?)
+### fs-list_directory(path, showHidden?)
 List files and directories with sizes.
-- `path` (string, optional): Directory path. Defaults to workspace root.
+- `path` (string): Directory path relative to workspace or absolute.
+- `showHidden` (bool, optional, default=false): Show hidden files and directories.
 - Directories shown with trailing `/`, files with human-readable sizes.
 
 ### fs-search_files(pattern, path?)

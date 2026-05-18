@@ -4,16 +4,15 @@ Store and retrieve memories using vector similarity and full-text search. Memori
 
 ## Tools
 
-### mem-create_memory(content, person?)
+### mem-create_memory(content, contactName?)
 Store a new memory.
 - `content` (string): The text to remember. Will be embedded for vector search.
-- `person` (string, optional): Link this memory to a person by name.
+- `contactName` (string, optional): Link this memory to a person by name.
 
-### mem-search_memories(query, person?, limit?)
+### mem-search_memories(query, contactName?)
 Search memories by keyword or phrase.
 - `query` (string): Search text. Matched via vector similarity and full-text search.
-- `person` (string, optional): Filter results to memories linked to this person.
-- `limit` (int, optional): Maximum results to return.
+- `contactName` (string, optional): Filter results to memories linked to this person by name.
 - Returns: memories ranked by relevance with their IDs, content, person, and timestamps.
 
 ### mem-update_memory(id, content)
@@ -27,8 +26,8 @@ Permanently delete a memory.
 
 ## Workflow
 
-1. `mem-create_memory(content="Lucas prefers dark mode", person="Lucas")` — store
-2. `mem-search_memories(query="preferences", person="Lucas")` — retrieve
+1. `mem-create_memory(content="Lucas prefers dark mode", contactName="Lucas")` — store
+2. `mem-search_memories(query="preferences", contactName="Lucas")` — retrieve
 3. `mem-update_memory(id=42, content="Lucas prefers light mode now")` — update
 4. `mem-delete_memory(id=42)` — remove if no longer relevant
 
