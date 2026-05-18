@@ -18,6 +18,7 @@ public class LisDbContext(DbContextOptions<LisDbContext> options) :DbContext(opt
 	public DbSet<ExecAllowlistEntity>       ExecAllowlist      { get; init; } = null!;
 	public DbSet<ScheduledTaskEntity>       ScheduledTasks     { get; init; } = null!;
 	public DbSet<SkillEntity>               Skills             { get; init; } = null!;
+	public DbSet<ToolDigestEntity>          ToolDigests        { get; init; } = null!;
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder) {
 		modelBuilder.HasPostgresExtension("vector");
