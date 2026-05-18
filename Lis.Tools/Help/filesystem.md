@@ -27,10 +27,10 @@ List files and directories with sizes.
 - `showHidden` (bool, optional, default=false): Show hidden files and directories.
 - Directories shown with trailing `/`, files with human-readable sizes.
 
-### fs-search_files(pattern, path?)
+### fs-search_files(pattern, root?)
 Search for files matching a glob pattern recursively.
 - `pattern` (string): Glob pattern (e.g. `*.json`, `**/*.md`).
-- `path` (string, optional): Base directory. Defaults to workspace.
+- `root` (string, optional): Root directory to search from. Defaults to workspace.
 
 ## Workflow
 

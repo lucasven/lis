@@ -93,7 +93,7 @@ public sealed class ConfigPlugin(IServiceScopeFactory scopeFactory, IOptions<Lis
 	}
 
 	[KernelFunction("update_agent_config")]
-	[Description("Update a configuration field on an agent. Valid keys: model, max_tokens, context_budget, thinking_effort, tool_notifications, compaction_threshold, keep_recent_tokens, tool_prune_threshold, tool_keep_threshold, tool_summarization_policy, display_name, mention_triggers. Omit agent to use current agent.")]
+	[Description("Update a configuration field on an agent. Valid keys: model, max_tokens, context_budget, thinking_effort, tool_notifications, compaction_threshold, keep_recent_tokens, tool_prune_threshold, tool_keep_threshold, tool_summarization_policy, display_name, mention_triggers, group_context_prompt, tool_profile, tools_allow, tools_deny, workspace_path, exec_security, exec_timeout_seconds. Omit agent to use current agent.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> UpdateAgentConfigAsync(
