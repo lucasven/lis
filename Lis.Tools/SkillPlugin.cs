@@ -15,7 +15,7 @@ namespace Lis.Tools;
 public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory) {
 
 	[KernelFunction("install")]
-	[Description("Install a skill from a URL. Fetches, validates, and stores the skill.")]
+	[Description("Install a skill from a GitHub repo URL (github.com/user/repo), raw .md URL, or local file path. Expects a SKILL.md with name/description YAML frontmatter. Assets are copied to workspace. Re-installing an existing name updates it.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > InstallAsync")]
@@ -121,7 +121,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("list")]
-	[Description("List installed skills. Optionally specify an agent name (owner only).")]
+	[Description("List installed skills with name, description, and enabled/disabled status. Omit agent to list current agent's skills. Specifying another agent's name requires owner permissions.")]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[Trace("SkillPlugin > ListAsync")]
@@ -148,7 +148,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("uninstall")]
-	[Description("Uninstall a skill by name.")]
+	[Description("Permanently remove an installed skill by name. Use skill_list to find exact names.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > UninstallAsync")]
@@ -174,7 +174,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("enable")]
-	[Description("Enable a disabled skill.")]
+	[Description("Enable a disabled skill by name. Enabled skills are loaded into the agent's system prompt on every message.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > EnableAsync")]
@@ -197,7 +197,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("disable")]
-	[Description("Disable a skill without uninstalling it.")]
+	[Description("Disable a skill without removing it. The skill stays installed but won't be loaded into the prompt until re-enabled.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > DisableAsync")]
@@ -220,7 +220,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("get")]
-	[Description("Get details of an installed skill.")]
+	[Description("Get full details of an installed skill: content, metadata, enabled/disabled status, and asset paths.")]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[Trace("SkillPlugin > GetAsync")]
@@ -251,7 +251,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("use")]
-	[Description("Activate a skill, loading its full instructions into the conversation.")]
+	[Description("Activate a skill for this conversation, loading its full instructions into context. The skill must be installed and enabled (see skill_install, skill_enable).")]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > UseAsync")]

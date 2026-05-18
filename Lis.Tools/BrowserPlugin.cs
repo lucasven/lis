@@ -13,7 +13,7 @@ namespace Lis.Tools;
 public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 
 	[KernelFunction("start")]
-	[Description("Launch a headless Chrome browser. Optionally navigate to a URL immediately.")]
+	[Description("Launch a headless Chrome browser session. Optionally navigate to a URL immediately. Must be called before any other browser tool. Only one session at a time.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> StartAsync(
@@ -63,7 +63,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("snapshot")]
-	[Description("Get the current page content as accessible plain text.")]
+	[Description("Get the current page's DOM as accessible plain text (aria tree). Cheaper than screenshot for reading text content. Includes element selectors for use with browser_click and browser_type.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> SnapshotAsync(
@@ -85,7 +85,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("screenshot")]
-	[Description("Take a screenshot of the current page.")]
+	[Description("Take a visual screenshot of the current page. Use browser_snapshot for text content instead — screenshots cost more tokens.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ScreenshotAsync(
@@ -107,7 +107,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("click")]
-	[Description("Click an element on the page by CSS selector.")]
+	[Description("Click an element by CSS selector. Use browser_snapshot first to find available selectors on the page.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ClickAsync(
@@ -126,7 +126,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("type")]
-	[Description("Type text into a form field identified by CSS selector.")]
+	[Description("Type text into a form field by CSS selector. Use browser_snapshot to find input selectors. The field is focused before typing.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> TypeAsync(
@@ -146,7 +146,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("evaluate")]
-	[Description("Execute JavaScript in the browser and return the result.")]
+	[Description("Execute JavaScript in the browser page context and return the result as a string. Useful for extracting data, manipulating the DOM, or interacting with page APIs.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> EvaluateAsync(
@@ -192,7 +192,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("close")]
-	[Description("Close the browser and end the session.")]
+	[Description("Close the browser and end the session. Call when done with browser tasks to free resources.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> CloseAsync() {

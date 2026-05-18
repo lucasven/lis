@@ -18,7 +18,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 	private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
 	[KernelFunction("cron_create")]
-	[Description("Create a scheduled task. Type 'prompt' sends the payload as a user message to the AI. Type 'message' sends it directly to the chat.")]
+	[Description("Create a scheduled task with a cron expression (e.g. '0 9 * * 1-5' for weekdays at 9am). Type 'prompt' sends the payload as a user message to the AI for processing. Type 'message' sends it directly to the chat without AI processing. Timezone is America/Sao_Paulo.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> CreateAsync(
 		[Description("Human-readable name")] string name,
@@ -72,7 +72,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("cron_list")]
-	[Description("List all scheduled tasks for the current chat.")]
+	[Description("List all scheduled tasks for the current chat with their ID, cron expression, type, enabled status, and next run time.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ListAsync() {
 		await ToolContext.NotifyAsync("📋 Listing scheduled tasks");
@@ -98,7 +98,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("cron_delete")]
-	[Description("Delete a scheduled task by ID.")]
+	[Description("Delete a scheduled task by its numeric ID. Use cron_cron_list to find task IDs.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> DeleteAsync(
 		[Description("Task ID to delete")] long id) {
@@ -118,7 +118,7 @@ public sealed class CronPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("cron_update")]
-	[Description("Update a scheduled task (enable/disable, change cron, change payload).")]
+	[Description("Update a scheduled task by ID. Can change cron expression, payload text, or toggle enabled/disabled. Use cron_cron_list to find task IDs and current values.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> UpdateAsync(
 		[Description("Task ID to update")] long id,

@@ -11,7 +11,7 @@ namespace Lis.Tools;
 public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client) {
 
 	[KernelFunction("list_agents")]
-	[Description("List all available agents and their capabilities. Returns name, description, and skills for each agent.")]
+	[Description("List all available agents with their name, description, and supported skills. Use this to discover which agent to delegate a task to before calling a2a_send.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public Task<string> ListAgentsAsync() {
@@ -31,7 +31,7 @@ public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client
 	}
 
 	[KernelFunction("get_agent")]
-	[Description("Get detailed information about a specific agent by name.")]
+	[Description("Get detailed info about a specific agent by name, including its full skill list and capabilities. Use a2a_list_agents first to find agent names.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public Task<string> GetAgentAsync(
@@ -58,7 +58,7 @@ public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client
 	}
 
 	[KernelFunction("send")]
-	[Description("Send a message to another agent and get their response. Use this to delegate tasks to specialized agents.")]
+	[Description("Send a message to another agent by name and get their response. The target agent processes the request independently with its own tools and context. Use a2a_list_agents to discover available agents first.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> SendAsync(

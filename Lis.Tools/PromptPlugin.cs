@@ -26,7 +26,7 @@ public sealed class PromptPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("list_prompt_sections")]
-	[Description("List prompt sections. Use type='names' for a summary or type='full' for complete content of all sections.")]
+	[Description("List the agent's prompt sections. Use type='names' for a summary (name + description only) or type='full' to see complete content of all sections. Prompt sections form the agent's system prompt.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> ListPromptSectionsAsync(
@@ -65,7 +65,7 @@ public sealed class PromptPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("get_prompt_section")]
-	[Description("Get the full content of a specific prompt section by name.")]
+	[Description("Get the full content of a specific prompt section by exact name. Use prompt_list_prompt_sections with type='names' to find section names.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> GetPromptSectionAsync(
@@ -88,7 +88,7 @@ public sealed class PromptPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("update_prompt_section")]
-	[Description("Create or update a prompt section. Creates the section if it doesn't exist. Changes take effect on the next message.")]
+	[Description("Create or update a prompt section by name. Creates it if it doesn't exist. Content is markdown text that becomes part of the agent's system prompt. Changes take effect on the next message.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> UpdatePromptSectionAsync(
