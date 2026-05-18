@@ -68,11 +68,23 @@ public sealed class CompactionService(
 				return;
 			}
 
-			// Build conversation text for summarization
-			string conversationText = BuildConversationText(messages, session.Summary);
+			// Load digests for this session (generated during tool pruning)
+			List<ToolDigestEntity> digests = await db.ToolDigests
+				.Where(d => d.SessionId == session.Id)
+				.OrderBy(d => d.CreatedAt)
+				.ToListAsync(ct);
+
+			// Build conversation text for summarization (with digests injected)
+			string conversationText = BuildConversationText(messages, session.Summary, digests);
 
 			// Call compaction LLM
 			(string summary, int summaryTokens) = await this.SummarizeAsync(conversationText, agentModelSettings.Model, ct);
+
+			// Delete digests — they've been incorporated into the summary
+			if (digests.Count > 0) {
+				db.ToolDigests.RemoveRange(digests);
+				await db.SaveChangesAsync(ct);
+			}
 
 			// Generate embedding
 			Vector? embedding = null;
@@ -239,8 +251,18 @@ public sealed class CompactionService(
 
 		if (messages.Count == 0) return;
 
-		string conversationText = BuildConversationText(messages, null);
+		List<ToolDigestEntity> digests = await db.ToolDigests
+			.Where(d => d.SessionId == session.Id)
+			.OrderBy(d => d.CreatedAt)
+			.ToListAsync(ct);
+
+		string conversationText = BuildConversationText(messages, null, digests);
 		(string summary, _) = await this.SummarizeAsync(conversationText, agentModelSettings.Model, ct);
+
+		// Delete digests — incorporated into summary
+		if (digests.Count > 0) {
+			db.ToolDigests.RemoveRange(digests);
+		}
 
 		Vector? embedding = null;
 		if (embeddingGenerator is not null) {
@@ -280,7 +302,10 @@ public sealed class CompactionService(
 		return (result.Text ?? "", outputTokens);
 	}
 
-	private static string BuildConversationText(IReadOnlyList<MessageEntity> messages, string? existingSummary) {
+	internal static string BuildConversationText(
+		IReadOnlyList<MessageEntity> messages, string? existingSummary,
+		IReadOnlyList<ToolDigestEntity>? digests = null) {
+
 		System.Text.StringBuilder sb = new();
 
 		if (existingSummary is { Length: > 0 })
@@ -290,6 +315,12 @@ public sealed class CompactionService(
 			string role = msg.IsFromMe ? "Assistant" : "User";
 			string body = msg.Body ?? "[media/tool]";
 			sb.AppendLine($"{role}: {body}");
+		}
+
+		if (digests is { Count: > 0 }) {
+			sb.AppendLine("\nTool context (from pruned tool calls):");
+			foreach (ToolDigestEntity digest in digests)
+				sb.AppendLine($"- {digest.Digest}");
 		}
 
 		return sb.ToString();
