@@ -69,6 +69,25 @@ public class TelegramFormatterTests {
 		Assert.Equal("`hello.world`", result);
 	}
 
+	// ── Tables ──────────────────────────────────────────────────────
+
+	[Fact]
+	public void Format_TableWithInlineCode_PreservesTextNotNumbers() {
+		string input =
+			"| Método | Endpoint | Descrição |\n" +
+			"|---|---|---|\n" +
+			"| `GET` | `/tasks` | Listar todas as tasks |\n" +
+			"| `POST` | `/tasks` | Criar task |";
+
+		string result = this._sut.Format(input);
+
+		Assert.Contains("GET", result);
+		Assert.Contains("/tasks", result);
+		Assert.Contains("POST", result);
+		Assert.Contains("Listar todas as tasks", result);
+		Assert.StartsWith("```", result);
+	}
+
 	// ── Mixed Content ───────────────────────────────────────────────
 
 	[Fact]

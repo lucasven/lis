@@ -60,7 +60,7 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 		List<(string placeholder, string replacement)> preserved = [];
 		int counter = 0;
 
-		// Phase 1: extract code blocks and inline code (preserve verbatim)
+		// Phase 1a: extract fenced code blocks (preserve verbatim)
 		content = FencedCodeRegex().Replace(content, m => {
 			string ph    = $"\x01{counter++}\x01";
 			string inner = EscapeCodeContent(m.Groups[1].Value);
@@ -68,14 +68,9 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 			return ph;
 		});
 
-		content = InlineCodeRegex().Replace(content, m => {
-			string ph    = $"\x01{counter++}\x01";
-			string inner = EscapeCodeContent(m.Groups[1].Value);
-			preserved.Add((ph, $"`{inner}`"));
-			return ph;
-		});
-
-		// Phase 2: convert markdown tables to monospace code blocks
+		// Phase 1b: convert markdown tables to monospace code blocks
+		// Must happen BEFORE inline code extraction — otherwise inline code inside
+		// table cells becomes numbered placeholders that never get restored.
 		content = TableRegex().Replace(content, m => {
 			string ph    = $"\x01{counter++}\x01";
 			string table = FormatTableAsMonospace(m.Groups[1].Value);
@@ -84,7 +79,15 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 			return ph;
 		});
 
-		// Phase 3: extract links
+		// Phase 1c: extract inline code (preserve verbatim)
+		content = InlineCodeRegex().Replace(content, m => {
+			string ph    = $"\x01{counter++}\x01";
+			string inner = EscapeCodeContent(m.Groups[1].Value);
+			preserved.Add((ph, $"`{inner}`"));
+			return ph;
+		});
+
+		// Phase 2: extract links
 		content = LinkRegex().Replace(content, m => {
 			string ph   = $"\x01{counter++}\x01";
 			string text = Escape(m.Groups[1].Value);
@@ -93,11 +96,11 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 			return ph;
 		});
 
-		// Phase 4: line-level formatting
+		// Phase 3: line-level formatting
 		content = HorizontalRuleRegex().Replace(content, "");
 		content = BlockquoteRegex().Replace(content, m => PH_QUOTE + m.Groups[1].Value);
 
-		// Phase 5: inline formatting → placeholders (order: bold-italic > bold > italic > strike)
+		// Phase 4: inline formatting → placeholders (order: bold-italic > bold > italic > strike)
 		content = BoldItalicRegex().Replace(content, m =>
 			PH_BOLD_OPEN + PH_ITALIC_OPEN + m.Groups[1].Value + PH_ITALIC_CLOSE + PH_BOLD_CLOSE);
 		content = BoldRegex().Replace(content, m =>
@@ -107,17 +110,17 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 		content = StrikethroughRegex().Replace(content, m =>
 			PH_STRIKE_OPEN + m.Groups[1].Value + PH_STRIKE_CLOSE);
 
-		// Phase 6: escape all remaining plain text
+		// Phase 5: escape all remaining plain text
 		content = EscapeRemaining(content);
 
-		// Phase 7: replace placeholders with actual Telegram MarkdownV2 markers
+		// Phase 6: replace placeholders with actual Telegram MarkdownV2 markers
 		content = content
 			.Replace(PH_BOLD_OPEN, "*").Replace(PH_BOLD_CLOSE, "*")
 			.Replace(PH_ITALIC_OPEN, "_").Replace(PH_ITALIC_CLOSE, "_")
 			.Replace(PH_STRIKE_OPEN, "~").Replace(PH_STRIKE_CLOSE, "~")
 			.Replace(PH_QUOTE, ">");
 
-		// Phase 8: restore preserved blocks
+		// Phase 7: restore preserved blocks
 		foreach ((string placeholder, string replacement) in preserved)
 			content = content.Replace(placeholder, replacement);
 
@@ -152,7 +155,7 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 				.ToArray();
 			if (cells.Length > 0 && string.IsNullOrWhiteSpace(cells[^1]))
 				cells = cells[..^1]; // skip empty after last |
-			rows.Add(cells.Select(c => c.Trim()).ToArray());
+			rows.Add(cells.Select(c => StripInlineCode(c.Trim())).ToArray());
 		}
 
 		if (rows.Count == 0) return table;
@@ -179,6 +182,10 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 		}
 
 		return sb.ToString().TrimEnd('\n');
+	}
+
+	private static string StripInlineCode(string text) {
+		return InlineCodeRegex().Replace(text, m => m.Groups[1].Value);
 	}
 
 	private static string EscapeRemaining(string content) {
