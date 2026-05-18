@@ -84,6 +84,7 @@ public static class AgentSetup {
 
 		// Compaction
 		services.AddSingleton<CompactionService>();
+		services.AddSingleton<DigestService>();
 
 		return services;
 	}
