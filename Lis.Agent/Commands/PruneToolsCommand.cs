@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Lis.Agent.Commands;
 
-public sealed class PruneToolsCommand(ModelSettings modelSettings) : IChatCommand {
+public sealed class PruneToolsCommand(ModelSettings modelSettings, DigestService digestService) : IChatCommand {
 	public string[] Triggers => ["/prune", "/prune-tools"];
 
 	public async Task<string> ExecuteAsync(CommandContext ctx, CancellationToken ct) {
@@ -33,6 +33,10 @@ public sealed class PruneToolsCommand(ModelSettings modelSettings) : IChatComman
 
 		ctx.Session.ToolsPrunedThroughId = lastMsgId;
 		await ctx.Db.SaveChangesAsync(ct);
+
+		// Generate digests for pruned tool calls
+		if (lastMsgId is not null)
+			_ = Task.Run(() => digestService.GenerateDigestsAsync(ctx.Session.Id, lastMsgId.Value, CancellationToken.None), CancellationToken.None);
 
 		int prunedEstimate = toolCount * 10;
 		long totalInput    = ctx.Session.ContextTokens;

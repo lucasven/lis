@@ -29,6 +29,7 @@ public sealed class ConversationService(
 	ContextWindowBuilder         contextWindowBuilder,
 	PromptComposer               promptComposer,
 	CompactionService            compactionService,
+	DigestService                digestService,
 	CommandRouter                commandRouter,
 	AgentService                 agentService,
 	IMediaProcessor              mediaProcessor,
@@ -398,6 +399,10 @@ public sealed class ConversationService(
 					.FirstOrDefaultAsync(ct);
 				session.ToolsPrunedThroughId = lastMsgId;
 				await db.SaveChangesAsync(ct);
+
+				// Generate digests before context is lost
+				if (lastMsgId is not null)
+					_ = Task.Run(() => digestService.GenerateDigestsAsync(session.Id, lastMsgId.Value, CancellationToken.None), CancellationToken.None);
 
 				if (lisOptions.Value.CompactionNotify) {
 					int prunedEstimate = toolCount * 10; // ~10 tokens per pruned result
