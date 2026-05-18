@@ -19,6 +19,7 @@ using Lis.Providers.OpenAi.Codex;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -73,6 +74,7 @@ builder.Services.AddOpenTelemetry()
 			   });
 		   }
 	   })
+	   .UseOtlpExporter()
 	   .UseGrafana();
 builder.Logging.AddOpenTelemetry(logging => {
 	logging.IncludeFormattedMessage = true;

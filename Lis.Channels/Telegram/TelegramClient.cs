@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using Lis.Core.Channel;
 using Lis.Core.Util;
 
@@ -14,6 +16,9 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 	[Trace("TelegramClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(
 		string chatId, string message, string? replyToId = null, CancellationToken ct = default) {
+
+		Activity.Current?.SetTag("chat.id", chatId);
+		Activity.Current?.SetTag("message.length", message.Length);
 
 		string             formatted = formatter.Format(message);
 		long               chatIdNum = long.Parse(chatId);

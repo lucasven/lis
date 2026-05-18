@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -97,6 +98,12 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 
 		TokenUsage? usage = usageExtractor.Extract(lastMetadata);
 
+		if (usage is not null) {
+			Activity.Current?.SetTag("gen_ai.usage.input_tokens", usage.InputTokens);
+			Activity.Current?.SetTag("gen_ai.usage.output_tokens", usage.OutputTokens);
+		}
+		Activity.Current?.SetTag("tool.calls_count", calls.Count);
+
 		// Build message with usage attached in metadata (thread-safe, per-message)
 		Dictionary<string, object?>? metadata = usage is not null
 			? new Dictionary<string, object?> { [UsageMetadataKey] = usage }
@@ -113,6 +120,10 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 	[Trace("ToolRunner > InvokeFunctionAsync")]
 	private async Task<FunctionResultContent> InvokeFunctionAsync(
 		Kernel kernel, FunctionCallContent call, CancellationToken ct) {
+
+		Activity.Current?.SetTag("tool.name", call.FunctionName);
+		Activity.Current?.SetTag("tool.plugin", call.PluginName);
+
 		try {
 			// Authorization gate
 			ToolAuthLevel level = authRegistry.GetLevel(call.PluginName, call.FunctionName);

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using Lis.Channels.WhatsApp.Schemas;
 using Lis.Core.Channel;
 using Lis.Core.Util;
@@ -9,6 +11,10 @@ public sealed class WhatsAppClient(GowaClient gowa, WhatsAppFormatter formatter)
 	[Trace("WhatsAppClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(
 		string chatId, string message, string? replyToId = null, CancellationToken ct = default) {
+
+		Activity.Current?.SetTag("chat.id", chatId);
+		Activity.Current?.SetTag("message.length", message.Length);
+
 		string formatted = formatter.Format(message);
 		SendResult? result = await gowa.SendMessageAsync(
 			StripJidSuffix(chatId), formatted, replyToId, ct: ct);

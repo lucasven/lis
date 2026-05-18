@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 using Lis.Core.Channel;
@@ -17,6 +18,9 @@ public sealed class MattermostClient(
 	[Trace("MattermostClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(
 		string chatId, string message, string? replyToId = null, CancellationToken ct = default) {
+
+		Activity.Current?.SetTag("chat.id", chatId);
+		Activity.Current?.SetTag("message.length", message.Length);
 
 		MattermostApiClient api = this.ResolveApiClient();
 		string formatted = formatter.Format(message);
