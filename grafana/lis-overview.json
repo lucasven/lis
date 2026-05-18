@@ -148,9 +148,9 @@
     },
     {
       "type": "stat",
-      "title": "DB Connections",
+      "title": "Errors (1h)",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -158,8 +158,8 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 80 },
-              { "color": "red", "value": 95 }
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
             ]
           },
           "color": { "mode": "thresholds" },
@@ -174,24 +174,19 @@
           "values": false
         },
         "orientation": "auto",
-        "textMode": "value_and_name",
+        "textMode": "auto",
         "wideLayout": true,
         "colorMode": "background",
-        "graphMode": "none",
+        "graphMode": "area",
         "justifyMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(db_client_connection_count{service_name=\"Lis.Api\"}) by (db_client_connection_state)",
-          "legendFormat": "{{db_client_connection_state}}",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_max{service_name=\"Lis.Api\"}",
-          "legendFormat": "Max",
-          "refId": "B"
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=\"lis\"} | detected_level=\"error\" [1h]))",
+          "legendFormat": "Errors",
+          "refId": "A",
+          "queryType": "instant"
         }
       ]
     },
@@ -470,55 +465,25 @@
       ]
     },
     {
-      "type": "timeseries",
-      "title": "DB Connection Pool",
+      "type": "logs",
+      "title": "Error Logs",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto",
-            "spanNulls": false,
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Max" },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": { "fill": "dash", "dash": [10, 10] }
-              },
-              {
-                "id": "color",
-                "value": { "mode": "fixed", "fixedColor": "red" }
-              }
-            ]
-          }
-        ]
-      },
+      "datasource": { "type": "loki", "uid": "loki" },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(db_client_connection_count{service_name=\"Lis.Api\"}) by (db_client_connection_state)",
-          "legendFormat": "{{db_client_connection_state}}",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service_name=\"lis\"} | detected_level=\"error\" or detected_level=\"warning\"",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_max{service_name=\"Lis.Api\"}",
-          "legendFormat": "Max",
-          "refId": "B"
         }
       ]
     },
