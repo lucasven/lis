@@ -6,7 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test
+        env:
+          DOTNET_ROOT: /home/agenticcompany/.dotnet
+        run: |
+          export PATH="$DOTNET_ROOT:$PATH"
+          dotnet test Lis.Tests/Lis.Tests.csproj -c Release --logger "console;verbosity=minimal"
+
   deploy:
+    needs: test
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
