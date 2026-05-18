@@ -20,7 +20,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	private const int MaxSearchResults = 10;
 
 	[KernelFunction("create_memory")]
-	[Description("Store a new memory. Optionally link to a person by name.")]
+	[Description("Store a new memory with text content. Optionally link it to a person by name for filtered retrieval later. Memories are searchable via vector similarity and full-text search.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> CreateMemoryAsync(
@@ -49,7 +49,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("search_memories")]
-	[Description("Search stored memories by keyword or phrase. Optionally filter by person.")]
+	[Description("Search memories by keyword or phrase using vector similarity and full-text search. Optionally filter results to a specific person. Returns matching memories ranked by relevance.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> SearchMemoriesAsync(
@@ -91,7 +91,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("update_memory")]
-	[Description("Update an existing memory's content.")]
+	[Description("Update an existing memory's text content by its numeric ID. Use mem-search_memories to find memory IDs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> UpdateMemoryAsync(
@@ -113,7 +113,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("delete_memory")]
-	[Description("Delete a memory by ID.")]
+	[Description("Permanently delete a memory by its numeric ID. Use mem-search_memories to find memory IDs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> DeleteMemoryAsync(

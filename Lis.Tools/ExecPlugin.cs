@@ -18,7 +18,7 @@ public sealed class ExecPlugin(IServiceScopeFactory scopeFactory) {
 	private static readonly bool HostExec = Environment.GetEnvironmentVariable("LIS_EXEC_HOST") == "true";
 
 	[KernelFunction("run_command")]
-	[Description("Execute a shell command and return stdout, stderr, and exit code.")]
+	[Description("Execute a shell command in the workspace directory and return stdout, stderr, and exit code. Requires owner approval before execution. The command runs in bash with a timeout.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.ApprovalRequired)]
 	public async Task<string> RunCommandAsync(

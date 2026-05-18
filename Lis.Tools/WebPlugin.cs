@@ -14,7 +14,7 @@ namespace Lis.Tools;
 public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory) {
 
 	[KernelFunction("search")]
-	[Description("Search the web using a query string.")]
+	[Description("Search the web via Brave Search. Returns titles, URLs, and text snippets for matching results. Use web-fetch to read full page content from a result URL.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> SearchAsync(
@@ -73,7 +73,7 @@ public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory) {
 	}
 
 	[KernelFunction("fetch")]
-	[Description("Fetch the content of a URL and return it as plain text.")]
+	[Description("Fetch a URL and return its content as cleaned plain text (HTML tags stripped). Works for articles, docs, APIs, and any public URL. For interactive pages, use browser tools instead.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> FetchAsync(
