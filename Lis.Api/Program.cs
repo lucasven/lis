@@ -22,6 +22,7 @@ using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using System.Text.RegularExpressions;
 
 DotEnv.Load();
 
@@ -50,7 +51,13 @@ builder.Services.AddOpenTelemetry()
 	   })
 	   .WithTracing(tracing => {
 		   tracing.AddAspNetCoreInstrumentation();
-		   tracing.AddHttpClientInstrumentation(o => o.RecordException = true);
+		   tracing.AddHttpClientInstrumentation(o => {
+		   o.RecordException = true;
+		   o.EnrichWithHttpRequestMessage = (activity, request) => {
+			   if (request.RequestUri?.Host == "api.telegram.org")
+				   activity.SetTag("url.full", RedactTelegramToken(request.RequestUri));
+		   };
+	   });
 		   tracing.AddSource("Microsoft.SemanticKernel*");
 		   tracing.AddSource(TraceAspect.ActivitySource.Name);
 
@@ -227,4 +234,8 @@ static string Env(string key) {
 
 static int EnvInt(string key, int fallback) {
 	return int.TryParse(Environment.GetEnvironmentVariable(key), out int v) ? v : fallback;
+}
+
+static string RedactTelegramToken(Uri uri) {
+	return Regex.Replace(uri.ToString(), @"/bot[^/]+/", "/bot***/");
 }
