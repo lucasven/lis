@@ -97,7 +97,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(dotnet_process_cpu_time_seconds_total{service_name=\"lis\"}[5m]) * 100",
+          "expr": "sum(rate(dotnet_process_cpu_time_seconds_total{service_name=\"Lis.Api\"}[5m])) * 100",
           "legendFormat": "CPU %",
           "refId": "A"
         }
@@ -140,7 +140,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "dotnet_process_memory_working_set_bytes{service_name=\"lis\"}",
+          "expr": "dotnet_process_memory_working_set_bytes{service_name=\"Lis.Api\"}",
           "legendFormat": "Working Set",
           "refId": "A"
         }
@@ -183,13 +183,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_count{service_name=\"lis\"}",
-          "legendFormat": "Active",
+          "expr": "sum(db_client_connection_count{service_name=\"Lis.Api\"}) by (db_client_connection_state)",
+          "legendFormat": "{{db_client_connection_state}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_max{service_name=\"lis\"}",
+          "expr": "db_client_connection_max{service_name=\"Lis.Api\"}",
           "legendFormat": "Max",
           "refId": "B"
         }
@@ -232,7 +232,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(dotnet_exceptions_total{service_name=\"lis\"}[5m])) * 60",
+          "expr": "sum(rate(dotnet_exceptions_total{service_name=\"Lis.Api\"}[5m])) * 60",
           "legendFormat": "Exceptions/min",
           "refId": "A"
         }
@@ -272,13 +272,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.50, sum(rate(gen_ai_client_operation_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(gen_ai_client_operation_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(gen_ai_client_operation_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(gen_ai_client_operation_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         }
@@ -311,13 +311,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(gen_ai_client_token_usage_sum{service_name=\"lis\", gen_ai_token_type=\"input\"}[5m]) * 60",
+          "expr": "rate(gen_ai_client_token_usage_sum{service_name=\"Lis.Api\", gen_ai_token_type=\"input\"}[5m]) * 60",
           "legendFormat": "Input tokens/min",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(gen_ai_client_token_usage_sum{service_name=\"lis\", gen_ai_token_type=\"output\"}[5m]) * 60",
+          "expr": "rate(gen_ai_client_token_usage_sum{service_name=\"Lis.Api\", gen_ai_token_type=\"output\"}[5m]) * 60",
           "legendFormat": "Output tokens/min",
           "refId": "B"
         }
@@ -350,7 +350,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(semantic_kernel_function_invocation_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le, semantic_kernel_function_name))",
+          "expr": "histogram_quantile(0.95, sum(rate(semantic_kernel_function_invocation_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le, semantic_kernel_function_name))",
           "legendFormat": "{{semantic_kernel_function_name}}",
           "refId": "A"
         }
@@ -390,7 +390,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(http_client_request_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le, server_address))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_client_request_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le, server_address))",
           "legendFormat": "{{server_address}}",
           "refId": "A"
         }
@@ -423,7 +423,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "http_client_active_requests{service_name=\"lis\"}",
+          "expr": "http_client_active_requests{service_name=\"Lis.Api\"}",
           "legendFormat": "{{server_address}}",
           "refId": "A"
         }
@@ -463,13 +463,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.50, sum(rate(db_client_operation_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(db_client_operation_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(db_client_operation_duration_seconds_bucket{service_name=\"lis\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(db_client_operation_duration_seconds_bucket{service_name=\"Lis.Api\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         }
@@ -516,13 +516,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_count{service_name=\"lis\"}",
-          "legendFormat": "Active",
+          "expr": "sum(db_client_connection_count{service_name=\"Lis.Api\"}) by (db_client_connection_state)",
+          "legendFormat": "{{db_client_connection_state}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "db_client_connection_max{service_name=\"lis\"}",
+          "expr": "db_client_connection_max{service_name=\"Lis.Api\"}",
           "legendFormat": "Max",
           "refId": "B"
         }
@@ -562,8 +562,8 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(dotnet_gc_collections_total{service_name=\"lis\"}[5m])",
-          "legendFormat": "Gen {{dotnet_gc_generation}}",
+          "expr": "rate(dotnet_gc_collections_total{service_name=\"Lis.Api\"}[5m])",
+          "legendFormat": "Gen {{gc_heap_generation}}",
           "refId": "A"
         }
       ]
@@ -595,7 +595,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "dotnet_gc_last_collection_heap_size_bytes{service_name=\"lis\"}",
+          "expr": "dotnet_gc_last_collection_heap_size_bytes{service_name=\"Lis.Api\"}",
           "legendFormat": "Heap Size",
           "refId": "A"
         }
@@ -628,13 +628,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "dotnet_thread_pool_thread_count_total{service_name=\"lis\"}",
+          "expr": "dotnet_thread_pool_thread_count_total{service_name=\"Lis.Api\"}",
           "legendFormat": "Thread Count",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "dotnet_thread_pool_queue_length_total{service_name=\"lis\"}",
+          "expr": "dotnet_thread_pool_queue_length_total{service_name=\"Lis.Api\"}",
           "legendFormat": "Queue Length",
           "refId": "B"
         }
