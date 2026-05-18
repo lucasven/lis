@@ -32,7 +32,8 @@ public sealed class ToolPolicyService {
 		["group:a2a"]     = ["a2a_"],
 		["group:cron"]    = ["cron_"],
 		["group:prompt"]  = ["prompt_"],
-		["group:help"]    = ["help_"]
+		["group:help"]    = ["help_"],
+		["group:sub"]     = ["sub_"]
 	};
 
 	// Profile → allowed plugin names (registration names from AgentSetup)
