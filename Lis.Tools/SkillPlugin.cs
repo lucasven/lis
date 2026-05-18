@@ -148,7 +148,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("uninstall")]
-	[Description("Permanently remove an installed skill by name. Use skill_list to find exact names.")]
+	[Description("Permanently remove an installed skill by name. Use skill-list to find exact names.")]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > UninstallAsync")]
@@ -251,7 +251,7 @@ public sealed class SkillPlugin(IServiceScopeFactory scopeFactory, IHttpClientFa
 	}
 
 	[KernelFunction("use")]
-	[Description("Activate a skill for this conversation, loading its full instructions into context. The skill must be installed and enabled (see skill_install, skill_enable).")]
+	[Description("Activate a skill for this conversation, loading its full instructions into context. The skill must be installed and enabled (see skill-install, skill-enable).")]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[Trace("SkillPlugin > UseAsync")]

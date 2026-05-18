@@ -63,7 +63,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("snapshot")]
-	[Description("Get the current page's DOM as accessible plain text (aria tree). Cheaper than screenshot for reading text content. Includes element selectors for use with browser_click and browser_type.")]
+	[Description("Get the current page's DOM as accessible plain text (aria tree). Cheaper than screenshot for reading text content. Includes element selectors for use with browser-click and browser-type.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> SnapshotAsync(
@@ -85,7 +85,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("screenshot")]
-	[Description("Take a visual screenshot of the current page. Use browser_snapshot for text content instead — screenshots cost more tokens.")]
+	[Description("Take a visual screenshot of the current page. Use browser-snapshot for text content instead — screenshots cost more tokens.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ScreenshotAsync(
@@ -107,7 +107,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("click")]
-	[Description("Click an element by CSS selector. Use browser_snapshot first to find available selectors on the page.")]
+	[Description("Click an element by CSS selector. Use browser-snapshot first to find available selectors on the page.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ClickAsync(
@@ -126,7 +126,7 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("type")]
-	[Description("Type text into a form field by CSS selector. Use browser_snapshot to find input selectors. The field is focused before typing.")]
+	[Description("Type text into a form field by CSS selector. Use browser-snapshot to find input selectors. The field is focused before typing.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> TypeAsync(

@@ -65,7 +65,7 @@ public sealed class PromptPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("get_prompt_section")]
-	[Description("Get the full content of a specific prompt section by exact name. Use prompt_list_prompt_sections with type='names' to find section names.")]
+	[Description("Get the full content of a specific prompt section by exact name. Use prompt-list_prompt_sections with type='names' to find section names.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> GetPromptSectionAsync(

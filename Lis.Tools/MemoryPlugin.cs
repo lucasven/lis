@@ -91,7 +91,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("update_memory")]
-	[Description("Update an existing memory's text content by its numeric ID. Use mem_search_memories to find memory IDs.")]
+	[Description("Update an existing memory's text content by its numeric ID. Use mem-search_memories to find memory IDs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> UpdateMemoryAsync(
@@ -113,7 +113,7 @@ public sealed class MemoryPlugin(IServiceScopeFactory scopeFactory) {
 	}
 
 	[KernelFunction("delete_memory")]
-	[Description("Permanently delete a memory by its numeric ID. Use mem_search_memories to find memory IDs.")]
+	[Description("Permanently delete a memory by its numeric ID. Use mem-search_memories to find memory IDs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.Open)]
 	public async Task<string> DeleteMemoryAsync(
