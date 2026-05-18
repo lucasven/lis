@@ -14,9 +14,9 @@ public sealed class ToolPolicyService {
 
 	// Profile → plugin prefixes included
 	private static readonly Dictionary<string, string[]> Profiles = new(StringComparer.OrdinalIgnoreCase) {
-		["minimal"]  = ["dt_", "resp_"],
-		["standard"] = ["dt_", "resp_", "mem_", "prompt_", "cfg_", "web_", "cron_", "a2a_", "skill_"],
-		["coding"]   = ["dt_", "resp_", "mem_", "prompt_", "cfg_", "web_", "exec_", "fs_", "cron_", "a2a_", "skill_"],
+		["minimal"]  = ["dt_", "resp_", "help_"],
+		["standard"] = ["dt_", "resp_", "mem_", "prompt_", "cfg_", "web_", "cron_", "a2a_", "skill_", "sub_", "help_"],
+		["coding"]   = ["dt_", "resp_", "mem_", "prompt_", "cfg_", "web_", "exec_", "fs_", "cron_", "a2a_", "skill_", "sub_", "help_"],
 		["full"]     = [] // empty = everything
 	};
 
@@ -27,14 +27,19 @@ public sealed class ToolPolicyService {
 		["group:web"]     = ["web_"],
 		["group:browser"] = ["browser_"],
 		["group:memory"]  = ["mem_"],
-		["group:config"]  = ["cfg_"]
+		["group:config"]  = ["cfg_"],
+		["group:skills"]  = ["skill_"],
+		["group:a2a"]     = ["a2a_"],
+		["group:cron"]    = ["cron_"],
+		["group:prompt"]  = ["prompt_"],
+		["group:help"]    = ["help_"]
 	};
 
 	// Profile → allowed plugin names (registration names from AgentSetup)
 	private static readonly Dictionary<string, HashSet<string>> ProfilePlugins = new(StringComparer.OrdinalIgnoreCase) {
-		["minimal"]  = ["dt", "resp"],
-		["standard"] = ["dt", "resp", "mem", "prompt", "cfg", "web", "cron", "a2a", "skill"],
-		["coding"]   = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "cron", "a2a", "skill"],
+		["minimal"]  = ["dt", "resp", "help"],
+		["standard"] = ["dt", "resp", "mem", "prompt", "cfg", "web", "cron", "a2a", "skill", "sub", "help"],
+		["coding"]   = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "cron", "a2a", "skill", "sub", "help"],
 		["full"]     = [] // empty = everything
 	};
 
@@ -48,7 +53,7 @@ public sealed class ToolPolicyService {
 		if (!ProfilePlugins.TryGetValue(profileName, out HashSet<string>? baseSet) || baseSet.Count == 0) {
 			// "full" or unknown profile → all plugins allowed, start with everything
 			// Apply deny rules below if any
-			HashSet<string> all = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "browser", "cron", "a2a", "skill"];
+			HashSet<string> all = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "browser", "cron", "a2a", "skill", "sub", "help"];
 
 			if (agent.ExecSecurity == "deny") all.Remove("exec");
 			if (agent.ToolsDeny is { Length: > 0 } deny) ApplyDenyGlobs(all, deny);
