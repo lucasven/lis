@@ -82,6 +82,9 @@ if (Env("OPIK_ENABLED") == "true") {
 	builder.Services.AddScoped<OpikTracer>(sp =>
 		new OpikTracer(sp.GetRequiredService<OpikClient>(), opikOpts.Project, sp.GetRequiredService<ILogger<OpikTracer>>()));
 }
+else {
+	builder.Services.AddScoped<OpikTracer>(_ => null!);
+}
 
 // Configuration
 builder.Services.AddSingleton(Options.Create(new LisOptions {

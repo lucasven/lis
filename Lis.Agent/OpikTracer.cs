@@ -35,7 +35,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			input = new {
 				messages = history.Select(m => new {
 					role    = m.Role.Label,
-					content = m.Content?[..Math.Min(m.Content.Length, 2000)]
+					content = m.Content is { } c ? c[..Math.Min(c.Length, 2000)] : null
 				}).ToList()
 			};
 		}
