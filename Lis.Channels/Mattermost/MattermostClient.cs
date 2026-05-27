@@ -24,7 +24,7 @@ public sealed class MattermostClient(
 
 		MattermostApiClient api = this.ResolveApiClient();
 		string formatted = formatter.Format(message);
-		MattermostPost? post = await api.CreatePostAsync(chatId, formatted, replyToId, ct);
+		MattermostPost? post = await api.CreatePostAsync(chatId, formatted, replyToId, ct: ct);
 		return post?.Id;
 	}
 
@@ -73,6 +73,24 @@ public sealed class MattermostClient(
 		} catch (Exception ex) {
 			logger.LogDebug(ex, "Failed to add reaction");
 		}
+	}
+
+	[Trace("MattermostClient > SendFileAsync")]
+	public async Task<string?> SendFileAsync(
+		string chatId, MediaUpload media,
+		string? caption = null, string? replyToId = null, CancellationToken ct = default) {
+
+		Activity.Current?.SetTag("chat.id", chatId);
+		Activity.Current?.SetTag("file.mime_type", media.MimeType);
+		Activity.Current?.SetTag("file.size", media.Data.Length);
+
+		MattermostApiClient api = this.ResolveApiClient();
+
+		string   filename = media.ResolveFilename();
+		string[] fileIds  = await api.UploadFileAsync(chatId, filename, media.Data, media.MimeType, ct);
+
+		MattermostPost? post = await api.CreatePostAsync(chatId, caption ?? "", replyToId, fileIds, ct);
+		return post?.Id;
 	}
 
 	[Trace("MattermostClient > DownloadMediaAsync")]

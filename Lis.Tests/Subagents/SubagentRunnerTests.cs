@@ -468,4 +468,8 @@ internal sealed class FakeChannel : IChannelClient {
 
 	public Task<MediaDownload?> DownloadMediaAsync(string messageId, string chatId, string? mediaPath = null, CancellationToken ct = default) =>
 		Task.FromResult<MediaDownload?>(null);
+
+	public Task<string?> SendFileAsync(string chatId, MediaUpload media,
+		string? caption = null, string? replyToId = null, CancellationToken ct = default) =>
+		throw new NotSupportedException("File sending is not supported in tests.");
 }

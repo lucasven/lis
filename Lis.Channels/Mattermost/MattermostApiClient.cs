@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 using Lis.Core.Util;
@@ -9,17 +10,41 @@ public sealed class MattermostApiClient(HttpClient http) {
 
 	[Trace("MattermostApiClient > CreatePostAsync")]
 	public async Task<MattermostPost?> CreatePostAsync(
-		string channelId, string message, string? rootId = null, CancellationToken ct = default) {
+		string channelId, string message, string? rootId = null,
+		string[]? fileIds = null, CancellationToken ct = default) {
 
 		var payload = new {
 			channel_id = channelId,
 			message,
-			root_id = rootId ?? ""
+			root_id  = rootId ?? "",
+			file_ids = fileIds ?? Array.Empty<string>()
 		};
 
 		var response = await http.PostAsJsonAsync("/api/v4/posts", payload, ct);
 		response.EnsureSuccessStatusCode();
 		return await response.Content.ReadFromJsonAsync<MattermostPost>(ct);
+	}
+
+	[Trace("MattermostApiClient > UploadFileAsync")]
+	public async Task<string[]> UploadFileAsync(
+		string channelId, string filename, byte[] data, string contentType,
+		CancellationToken ct = default) {
+
+		using MultipartFormDataContent form = new();
+		form.Add(new StringContent(channelId), "channel_id");
+		form.Add(new ByteArrayContent(data) {
+			Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType) }
+		}, "files", filename);
+
+		HttpResponseMessage response = await http.PostAsync("/api/v4/files", form, ct);
+		response.EnsureSuccessStatusCode();
+
+		JsonNode? json   = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+		JsonArray? infos = json?["file_infos"]?.AsArray();
+		if (infos is null or { Count: 0 })
+			throw new InvalidOperationException("File upload returned no file_infos");
+
+		return infos.Select(i => i!["id"]!.GetValue<string>()).ToArray();
 	}
 
 	[Trace("MattermostApiClient > GetPostAsync")]
