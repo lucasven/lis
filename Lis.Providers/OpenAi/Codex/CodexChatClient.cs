@@ -294,6 +294,8 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 	public object? GetService(Type serviceType, object? serviceKey = null) {
 		if (serviceType == typeof(ChatClientMetadata))
 			return this.Metadata;
+		if (serviceType == typeof(ISessionAware))
+			return this;
 		return null;
 	}
 

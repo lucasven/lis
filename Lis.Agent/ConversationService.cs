@@ -157,7 +157,7 @@ public sealed class ConversationService(
 			return;
 		}
 
-		if (chatClient is ISessionAware sessionAware)
+		if (chatClient.GetService(typeof(ISessionAware)) is ISessionAware sessionAware)
 			sessionAware.SessionId = session.Id.ToString();
 
 		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);

@@ -33,9 +33,10 @@ public static class CodexProvider {
 		CodexTokenManager tokenManager = new(opts, new HttpClient());
 		CodexWebSocketTransport wsTransport = new(tokenManager, opts);
 		CodexChatClient chatClient = new(tokenManager, opts, httpClient, wsTransport);
+		IChatClient     otelClient = chatClient.AsBuilder().UseOpenTelemetry(sourceName: "codex").Build();
 
 		// Register as keyed services only — Anthropic remains the unkeyed default (INV-19)
-		services.AddKeyedSingleton<IChatClient>("codex", chatClient);
+		services.AddKeyedSingleton<IChatClient>("codex", otelClient);
 		services.AddKeyedSingleton<IUsageExtractor>("codex", new CodexUsageExtractor());
 		services.AddKeyedSingleton<ITokenCounter>("codex", new CodexTokenCounter());
 		services.AddKeyedSingleton("codex", tokenManager);

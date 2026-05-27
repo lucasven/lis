@@ -76,6 +76,8 @@ if (Env("OPIK_ENABLED") == "true") {
 	Sdk.CreateTracerProviderBuilder()
 	   .ConfigureResource(rb => rb.AddService("lis", serviceNamespace: "lis"))
 	   .AddSource("Microsoft.SemanticKernel*")
+	   .AddSource("codex")
+	   .AddSource("anthropic")
 	   .AddOtlpExporter(options => {
 		   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
 		   options.Protocol = OtlpExportProtocol.HttpProtobuf;
