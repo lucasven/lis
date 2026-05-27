@@ -54,7 +54,7 @@ public sealed class ToolPolicyService {
 		if (!ProfilePlugins.TryGetValue(profileName, out HashSet<string>? baseSet) || baseSet.Count == 0) {
 			// "full" or unknown profile → all plugins allowed, start with everything
 			// Apply deny rules below if any
-			HashSet<string> all = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "browser", "cron", "a2a", "skill", "sub", "help"];
+			HashSet<string> all = ["dt", "resp", "mem", "prompt", "cfg", "web", "exec", "fs", "browser", "cron", "a2a", "skill", "sub", "sendfile", "help"];
 
 			if (agent.ExecSecurity == "deny") all.Remove("exec");
 			if (agent.ToolsDeny is { Length: > 0 } deny) ApplyDenyGlobs(all, deny);
