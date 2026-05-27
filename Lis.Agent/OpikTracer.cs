@@ -10,6 +10,8 @@ namespace Lis.Agent;
 public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTracer> logger) {
 	private OpikTrace?         _trace;
 	private OpikSpan?          _currentLlmSpan;
+	private string?            _lastLlmSpanId;
+	private DateTimeOffset     _toolBatchStart;
 	private readonly List<OpikSpan> _spans = [];
 
 	private static string Now() => DateTimeOffset.UtcNow.ToString("O");
@@ -68,13 +70,15 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		}
 
 		this._spans.Add(this._currentLlmSpan);
+		this._lastLlmSpanId = this._currentLlmSpan.Id;
+		this._toolBatchStart = DateTimeOffset.UtcNow;
 		this._currentLlmSpan = null;
 	}
 
 	public void RecordToolSpan(FunctionCallContent call, FunctionResultContent result) {
 		if (this._trace is null) return;
 
-		string? parentId = this._spans.Count > 0 ? this._spans[^1].Id : null;
+		string? parentId = this._lastLlmSpanId;
 
 		this._spans.Add(new OpikSpan {
 			Id           = Guid.NewGuid().ToString(),
@@ -83,14 +87,14 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			ProjectName  = project,
 			Name         = $"tool {call.FunctionName}",
 			Type         = "tool",
-			StartTime    = Now(),
+			StartTime    = this._toolBatchStart.ToString("O"),
 			EndTime      = Now(),
 			Input        = new { name = call.FunctionName, plugin = call.PluginName, arguments = call.Arguments },
 			Output       = new { result = result.Result?.ToString() }
 		});
 	}
 
-	public void EndTrace(string? finalResponse, TokenUsage? totalUsage, Exception? error = null) {
+	public async Task EndTraceAsync(string? finalResponse, TokenUsage? totalUsage, Exception? error = null) {
 		if (this._trace is null) return;
 
 		this._trace.EndTime = Now();
@@ -112,18 +116,13 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			};
 		}
 
-		// Fire-and-forget flush
-		OpikTrace trace = this._trace;
-		List<OpikSpan> spans = [.. this._spans];
-		_ = Task.Run(async () => {
-			try {
-				await client.SendTracesAsync([trace]);
-				if (spans.Count > 0)
-					await client.SendSpansAsync(spans);
-			} catch (Exception ex) {
-				if (logger.IsEnabled(LogLevel.Debug))
-					logger.LogDebug(ex, "Failed to send Opik trace {TraceId}", trace.Id);
-			}
-		});
+		try {
+			await client.SendTracesAsync([this._trace]);
+			if (this._spans.Count > 0)
+				await client.SendSpansAsync(this._spans);
+		} catch (Exception ex) {
+			if (logger.IsEnabled(LogLevel.Debug))
+				logger.LogDebug(ex, "Failed to send Opik trace {TraceId}", this._trace.Id);
+		}
 	}
 }

@@ -190,6 +190,7 @@ public sealed class ConversationService(
 					CreatedAt = DateTimeOffset.UtcNow
 				});
 				await db.SaveChangesAsync(ct);
+				if (opikTracer is not null) await opikTracer.EndTraceAsync(null, null);
 				return;
 			}
 
@@ -209,6 +210,7 @@ public sealed class ConversationService(
 				CreatedAt = DateTimeOffset.UtcNow
 			});
 			await db.SaveChangesAsync(ct);
+			if (opikTracer is not null) await opikTracer.EndTraceAsync(null, null);
 			return;
 		}
 
@@ -286,6 +288,7 @@ public sealed class ConversationService(
 		TokenUsage? prevUsage = null;
 		List<long>  pendingToolMsgIds = new();
 		bool        sentAnyMessage    = false;
+		string?     lastAssistantText = null;
 
 		try {
 			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
@@ -296,7 +299,8 @@ public sealed class ConversationService(
 						content = await this.DenormalizeMentionsAsync(content, message.ChatId, message.SenderId, ct);
 						externalId = await channel.SendMessageAsync(
 							message.ChatId, content, shouldQuote ? message.ExternalId : null, ct);
-						sentAnyMessage = true;
+						sentAnyMessage    = true;
+						lastAssistantText = content;
 					}
 				}
 
@@ -350,9 +354,13 @@ public sealed class ConversationService(
 					await channel.SendMessageAsync(message.ChatId, errorMsg, message.ExternalId, ct);
 				}
 				Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
-				opikTracer?.EndTrace(null, lastUsage, ex);
+				if (opikTracer is not null) await opikTracer.EndTraceAsync(null, lastUsage, ex);
 				return;
 			}
+			if (opikTracer is not null) await opikTracer.EndTraceAsync(null, lastUsage, ex);
+			throw;
+		} catch (OperationCanceledException) {
+			if (opikTracer is not null) await opikTracer.EndTraceAsync(null, lastUsage);
 			throw;
 		}
 
@@ -360,7 +368,7 @@ public sealed class ConversationService(
 		if (!sentAnyMessage)
 			await channel.StopTypingAsync(message.ChatId, ct);
 
-		opikTracer?.EndTrace(sentAnyMessage ? "sent" : null, lastUsage);
+		if (opikTracer is not null) await opikTracer.EndTraceAsync(lastAssistantText, lastUsage);
 
 		// Update session token stats from last response
 		if (lastUsage is not null) {

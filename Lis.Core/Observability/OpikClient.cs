@@ -60,12 +60,10 @@ public sealed class OpikClient : IDisposable {
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 	};
 
-	private readonly HttpClient   _http;
-	private readonly OpikOptions  _options;
+	private readonly HttpClient _http;
 
 	public OpikClient(OpikOptions options) {
-		this._options = options;
-		this._http    = new HttpClient { BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/") };
+		this._http = new HttpClient { BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/") };
 
 		if (options.ApiKey is { Length: > 0 })
 			this._http.DefaultRequestHeaders.TryAddWithoutValidation("authorization", options.ApiKey);
@@ -75,14 +73,16 @@ public sealed class OpikClient : IDisposable {
 
 	public async Task SendTracesAsync(IReadOnlyList<OpikTrace> traces, CancellationToken ct = default) {
 		if (traces.Count == 0) return;
-		await this._http.PostAsJsonAsync("api/v1/private/traces/batch",
+		HttpResponseMessage resp = await this._http.PostAsJsonAsync("api/v1/private/traces/batch",
 			new { traces }, JsonOpts, ct);
+		resp.EnsureSuccessStatusCode();
 	}
 
 	public async Task SendSpansAsync(IReadOnlyList<OpikSpan> spans, CancellationToken ct = default) {
 		if (spans.Count == 0) return;
-		await this._http.PostAsJsonAsync("api/v1/private/spans/batch",
+		HttpResponseMessage resp = await this._http.PostAsJsonAsync("api/v1/private/spans/batch",
 			new { spans }, JsonOpts, ct);
+		resp.EnsureSuccessStatusCode();
 	}
 
 	public void Dispose() => this._http.Dispose();
