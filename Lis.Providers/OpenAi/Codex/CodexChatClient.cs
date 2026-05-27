@@ -79,7 +79,10 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 		[EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
 		IList<ChatMessage> messageList = chatMessages as IList<ChatMessage> ?? chatMessages.ToList();
+		System.Diagnostics.Activity.Current?.SetTag("codex.options_model_id", options?.ModelId ?? "(null)");
+		System.Diagnostics.Activity.Current?.SetTag("codex.default_model", this._options.Model);
 		CodexRequest request = BuildRequest(messageList, options, this.SessionId, this._options);
+		System.Diagnostics.Activity.Current?.SetTag("codex.resolved_model", request.Model);
 		CodexTokenInfo token = await this._tokenManager.GetValidTokenAsync(cancellationToken);
 		Dictionary<string, string> headers = BuildBaseHeaders(token);
 
