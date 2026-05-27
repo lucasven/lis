@@ -19,6 +19,9 @@ using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 
+using FunctionCallContent = Microsoft.SemanticKernel.FunctionCallContent;
+using FunctionResultContent = Microsoft.SemanticKernel.FunctionResultContent;
+
 namespace Lis.Agent;
 
 public sealed class ConversationService(
@@ -37,6 +40,7 @@ public sealed class ConversationService(
 	IApprovalService             approvalService,
 	ToolPolicyService            toolPolicyService,
 	ErrorSuppressionService      errorSuppression,
+	OpikTracer?                  opikTracer,
 	IOptions<LisOptions>         lisOptions,
 	ILogger<ConversationService> logger) : IConversationService {
 
@@ -157,7 +161,7 @@ public sealed class ConversationService(
 			return;
 		}
 
-		if (chatClient.GetService(typeof(ISessionAware)) is ISessionAware sessionAware)
+		if (chatClient is ISessionAware sessionAware)
 			sessionAware.SessionId = session.Id.ToString();
 
 		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);
@@ -165,6 +169,9 @@ public sealed class ConversationService(
 		Activity.Current?.SetTag("agent.db_model", agent.Model);
 		Activity.Current?.SetTag("agent.model_settings_model", agentModelSettings.Model);
 		Activity.Current?.SetTag("agent.name",     agent.DisplayName ?? agent.Name);
+
+		opikTracer?.StartTrace(message.ChatId, agent.DisplayName ?? agent.Name,
+			agent.Provider, agentModelSettings.Model, session.Id, message);
 
 		// Handle commands before AI processing
 		if (commandRouter.Match(message.Body) is { } match) {
@@ -296,6 +303,26 @@ public sealed class ConversationService(
 				// Usage is attached per-message by ToolRunner (only on assistant messages)
 				TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
 
+				// Opik: track LLM and tool spans
+				if (msg.Role == AuthorRole.Assistant) {
+					if (msgUsage is not null) opikTracer?.EndLlmSpan(msg, msgUsage);
+					else opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider);
+				}
+
+				if (msg.Role == AuthorRole.Tool) {
+					foreach (KernelContent item in msg.Items) {
+						if (item is FunctionResultContent fr) {
+							FunctionCallContent? matchingCall = null;
+							foreach (ChatMessageContent prev in chatHistory.AsEnumerable().Reverse()) {
+								matchingCall = prev.Items.OfType<FunctionCallContent>()
+									.FirstOrDefault(c => c.Id == fr.CallId);
+								if (matchingCall is not null) break;
+							}
+							if (matchingCall is not null) opikTracer?.RecordToolSpan(matchingCall, fr);
+						}
+					}
+				}
+
 				// Back-fill tool result token counts from the API input delta
 				if (msgUsage is not null && prevUsage is not null && pendingToolMsgIds.Count > 0) {
 					int contentOutput = prevUsage.OutputTokens - prevUsage.ThinkingTokens;
@@ -323,6 +350,7 @@ public sealed class ConversationService(
 					await channel.SendMessageAsync(message.ChatId, errorMsg, message.ExternalId, ct);
 				}
 				Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+				opikTracer?.EndTrace(null, lastUsage, ex);
 				return;
 			}
 			throw;
@@ -331,6 +359,8 @@ public sealed class ConversationService(
 		// Clear typing indicator if no message was sent (NO_RESPONSE)
 		if (!sentAnyMessage)
 			await channel.StopTypingAsync(message.ChatId, ct);
+
+		opikTracer?.EndTrace(sentAnyMessage ? "sent" : null, lastUsage);
 
 		// Update session token stats from last response
 		if (lastUsage is not null) {

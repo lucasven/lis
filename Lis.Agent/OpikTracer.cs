@@ -59,7 +59,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		this._currentLlmSpan = null;
 	}
 
-	public void RecordToolSpan(Microsoft.Extensions.AI.FunctionCallContent call, Microsoft.Extensions.AI.FunctionResultContent result) {
+	public void RecordToolSpan(FunctionCallContent call, FunctionResultContent result) {
 		if (this._trace is null) return;
 
 		string? parentId = this._spans.Count > 0 ? this._spans[^1].Id : null;
@@ -69,11 +69,11 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			TraceId      = this._trace.Id,
 			ParentSpanId = parentId,
 			ProjectName  = project,
-			Name         = $"tool {call.Name}",
+			Name         = $"tool {call.FunctionName}",
 			Type         = "tool",
 			StartTime    = Now(),
 			EndTime      = Now(),
-			Input        = new { name = call.Name, arguments = call.Arguments },
+			Input        = new { name = call.FunctionName, plugin = call.PluginName, arguments = call.Arguments },
 			Output       = new { result = result.Result?.ToString() }
 		});
 	}
