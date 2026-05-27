@@ -161,6 +161,8 @@ public sealed class ConversationService(
 
 		Activity.Current?.SetTag("gen_ai.system",  agent.Provider);
 		Activity.Current?.SetTag("session.id",     session.Id.ToString());
+		Activity.Current?.SetTag("agent.db_model", agent.Model);
+		Activity.Current?.SetTag("agent.model_settings_model", agentModelSettings.Model);
 		Activity.Current?.SetTag("agent.name",     agent.DisplayName ?? agent.Name);
 
 		// Handle commands before AI processing
@@ -270,6 +272,7 @@ public sealed class ConversationService(
 			FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: false),
 			ExtensionData          = extensionData
 		};
+		Activity.Current?.SetTag("agent.sk_settings_model_id", settings.ModelId);
 
 		TokenUsage? lastUsage = null;
 		TokenUsage? prevUsage = null;

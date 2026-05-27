@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -40,6 +41,9 @@ public sealed class CodexTransportSelector {
 		// No session ID → SSE (WebSocket needs session for caching)
 		if (effective != CodexTransport.Sse && sessionId is null)
 			effective = CodexTransport.Sse;
+
+		Activity.Current?.SetTag("codex.transport", effective.ToString());
+		Activity.Current?.SetTag("codex.request_model", request.Model ?? "(null)");
 
 		return effective switch {
 			CodexTransport.WebSocket => this.StreamWebSocketAsync(request, sessionId!, headers, ct),
@@ -93,9 +97,12 @@ public sealed class CodexTransportSelector {
 		[EnumeratorCancellation] CancellationToken ct) {
 
 		CodexRequest effective = this._wsTransport.BuildRequestWithDelta(sessionId, request);
+		Activity.Current?.SetTag("codex.ws_delta_model", effective.Model ?? "(null)");
+		Activity.Current?.SetTag("codex.ws_has_prev_response", effective.PreviousResponseId is not null);
 
 		(ClientWebSocket socket, bool reused, Action<bool> release) =
 			await this._wsTransport.AcquireAsync(sessionId, ct);
+		Activity.Current?.SetTag("codex.ws_reused", reused);
 
 		bool success = false;
 		try {
@@ -104,6 +111,9 @@ public sealed class CodexTransportSelector {
 				["type"]     = "response.create",
 				["response"] = JsonSerializer.SerializeToNode(effective)
 			};
+
+			Activity.Current?.SetTag("codex.ws_payload_model",
+				wsMessage["response"]?["model"]?.GetValue<string>() ?? "(missing)");
 
 			byte[] payload = Encoding.UTF8.GetBytes(wsMessage.ToJsonString());
 			await socket.SendAsync(payload, WebSocketMessageType.Text, true, ct);
