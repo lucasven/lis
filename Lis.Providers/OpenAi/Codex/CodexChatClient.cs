@@ -69,7 +69,7 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 			responseMessage.Contents.Add(content);
 
 		return new ChatResponse(responseMessage) {
-			ModelId = options?.ModelId ?? this._options.Model
+			ModelId = !string.IsNullOrEmpty(options?.ModelId) ? options.ModelId : this._options.Model
 		};
 	}
 
@@ -229,7 +229,7 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 			: null;
 
 		return new CodexRequest {
-			Model              = options?.ModelId ?? codexOptions.Model,
+			Model              = !string.IsNullOrEmpty(options?.ModelId) ? options.ModelId : codexOptions.Model,
 			Instructions       = instructions ?? "",
 			Input              = input,
 			Tools              = tools,
