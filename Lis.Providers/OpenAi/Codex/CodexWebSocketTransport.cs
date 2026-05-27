@@ -16,11 +16,13 @@ public sealed class CachedWebSocketConnection : IDisposable {
 	public ClientWebSocket Socket             { get; }
 	public bool            Busy               { get; set; }
 	public WebSocketContinuation? Continuation { get; set; }
+	public DateTimeOffset  CreatedAt          { get; }
 	public DateTimeOffset  LastUsed           { get; set; }
 
 	public CachedWebSocketConnection(ClientWebSocket socket) {
-		this.Socket   = socket;
-		this.LastUsed = DateTimeOffset.UtcNow;
+		this.Socket    = socket;
+		this.CreatedAt = DateTimeOffset.UtcNow;
+		this.LastUsed  = DateTimeOffset.UtcNow;
 	}
 
 	public void Dispose() {
@@ -29,7 +31,11 @@ public sealed class CachedWebSocketConnection : IDisposable {
 }
 
 public sealed class CodexWebSocketTransport : IDisposable {
-	public static readonly TimeSpan IdleTtl = TimeSpan.FromMinutes(5);
+	public static readonly TimeSpan IdleTtl            = TimeSpan.FromMinutes(5);
+	public static readonly TimeSpan MaxConnectionAge   = TimeSpan.FromMinutes(30);
+	public static readonly TimeSpan KeepAliveInterval  = TimeSpan.FromSeconds(20);
+	public static readonly TimeSpan KeepAliveTimeout   = TimeSpan.FromSeconds(30);
+	public static readonly TimeSpan ReceiveIdleTimeout = TimeSpan.FromSeconds(120);
 
 	private readonly CodexTokenManager _tokenManager;
 	private readonly CodexOptions      _options;
@@ -61,17 +67,25 @@ public sealed class CodexWebSocketTransport : IDisposable {
 	public async Task<(ClientWebSocket Socket, bool Reused, Action<bool> Release)> AcquireAsync(
 		string sessionId, CancellationToken ct = default) {
 
-		// Try to reuse a cached connection
+		// Try to reuse a cached connection (reject if too old — prevents session degradation)
 		if (this._pool.TryGetValue(sessionId, out CachedWebSocketConnection? cached)
 		    && !cached.Busy
-		    && cached.Socket.State == WebSocketState.Open) {
+		    && cached.Socket.State == WebSocketState.Open
+		    && DateTimeOffset.UtcNow - cached.CreatedAt < MaxConnectionAge) {
 			cached.Busy     = true;
 			cached.LastUsed = DateTimeOffset.UtcNow;
 			return (cached.Socket, true, success => this.Release(sessionId, cached, success));
 		}
 
+		// Dispose stale cached connection before opening a new one
+		if (cached is not null && this._pool.TryRemove(sessionId, out CachedWebSocketConnection? stale))
+			stale.Dispose();
+
 		// Open a fresh connection
 		ClientWebSocket ws = new();
+		ws.Options.KeepAliveInterval = KeepAliveInterval;
+		ws.Options.KeepAliveTimeout  = KeepAliveTimeout;
+
 		CodexTokenInfo token = await this._tokenManager.GetValidTokenAsync(ct);
 
 		string url = ResolveWebSocketUrl(this._options.BaseUrl);
@@ -160,7 +174,18 @@ public sealed class CodexWebSocketTransport : IDisposable {
 
 			WebSocketReceiveResult result;
 			do {
-				result = await socket.ReceiveAsync(buffer, ct);
+				// Per-receive idle timeout: abort if no frame arrives within the window
+				using CancellationTokenSource idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+				idleCts.CancelAfter(ReceiveIdleTimeout);
+
+				try {
+					result = await socket.ReceiveAsync(buffer, idleCts.Token);
+				} catch (OperationCanceledException) when (!ct.IsCancellationRequested) {
+					throw new WebSocketException(
+						WebSocketError.ConnectionClosedPrematurely,
+						$"No data received for {ReceiveIdleTimeout.TotalSeconds}s — connection presumed stale");
+				}
+
 				if (result.MessageType == WebSocketMessageType.Close) yield break;
 				await ms.WriteAsync(buffer.AsMemory(0, result.Count), ct);
 			} while (!result.EndOfMessage);
@@ -218,9 +243,15 @@ public sealed class CodexWebSocketTransport : IDisposable {
 	}
 
 	private void EvictExpired() {
-		DateTimeOffset cutoff = DateTimeOffset.UtcNow - IdleTtl;
+		DateTimeOffset now       = DateTimeOffset.UtcNow;
+		DateTimeOffset idleCut   = now - IdleTtl;
+		DateTimeOffset ageCut    = now - MaxConnectionAge;
+
 		foreach ((string key, CachedWebSocketConnection conn) in this._pool) {
-			if (conn.LastUsed < cutoff && !conn.Busy) {
+			bool tooOld  = conn.CreatedAt < ageCut;
+			bool tooIdle = conn.LastUsed < idleCut;
+
+			if ((tooOld || tooIdle) && !conn.Busy) {
 				if (this._pool.TryRemove(key, out CachedWebSocketConnection? removed))
 					removed.Dispose();
 			}

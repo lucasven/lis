@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -623,6 +624,10 @@ public sealed class ConversationService(
 			string userMsg = rawIdx > 0 ? msg[..rawIdx] : msg;
 			return $"⚠️ Something went wrong with provider '{agent.Provider}': {userMsg}. Try again or use /auth codex if the issue persists.";
 		}
+
+		// WebSocket transport errors (connection dropped, idle timeout, server closed unexpectedly)
+		if (ex is WebSocketException)
+			return $"⚠️ Connection to provider '{agent.Provider}' was lost. Try again.";
 
 		return null;
 	}
