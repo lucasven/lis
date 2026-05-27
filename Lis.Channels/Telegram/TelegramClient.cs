@@ -84,6 +84,10 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 		return new MediaDownload(data, mimeType);
 	}
 
+	public Task<string?> SendFileAsync(string chatId, MediaUpload media,
+		string? caption = null, string? replyToId = null, CancellationToken ct = default) =>
+		throw new NotSupportedException("File sending is not supported on Telegram yet.");
+
 	private static string GuessMimeType(string path) => Path.GetExtension(path).ToLowerInvariant() switch {
 		".jpg" or ".jpeg" => "image/jpeg",
 		".png"            => "image/png",

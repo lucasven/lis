@@ -7,4 +7,5 @@ public interface IChannelClient {
 	Task MarkReadAsync(string messageId, string chatId, CancellationToken ct = default);
 	Task ReactAsync(string messageId, string chatId, string emoji, CancellationToken ct = default);
 	Task<MediaDownload?> DownloadMediaAsync(string messageId, string chatId, string? mediaPath = null, CancellationToken ct = default);
+	Task<string?> SendFileAsync(string chatId, MediaUpload media, string? caption = null, string? replyToId = null, CancellationToken ct = default);
 }

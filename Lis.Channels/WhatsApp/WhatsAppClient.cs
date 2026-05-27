@@ -63,6 +63,10 @@ public sealed class WhatsAppClient(GowaClient gowa, WhatsAppFormatter formatter)
 		return new MediaDownload(data, mimeType);
 	}
 
+	public Task<string?> SendFileAsync(string chatId, MediaUpload media,
+		string? caption = null, string? replyToId = null, CancellationToken ct = default) =>
+		throw new NotSupportedException("File sending is not supported on WhatsApp yet.");
+
 	private static string StripJidSuffix(string jid) {
 		int atIndex = jid.IndexOf('@');
 		return atIndex > 0 ? jid[..atIndex] : jid;
