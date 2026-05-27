@@ -106,14 +106,13 @@ public sealed class CodexTransportSelector {
 
 		bool success = false;
 		try {
-			// Send the request via WebSocket
-			JsonObject wsMessage = new() {
-				["type"]     = "response.create",
-				["response"] = JsonSerializer.SerializeToNode(effective)
-			};
+			// Responses API WebSocket: fields are top-level in response.create, not nested
+			JsonObject wsMessage = JsonSerializer.Deserialize<JsonObject>(
+				JsonSerializer.Serialize(effective))!;
+			wsMessage["type"] = "response.create";
 
 			Activity.Current?.SetTag("codex.ws_payload_model",
-				wsMessage["response"]?["model"]?.GetValue<string>() ?? "(missing)");
+				wsMessage["model"]?.GetValue<string>() ?? "(missing)");
 
 			byte[] payload = Encoding.UTF8.GetBytes(wsMessage.ToJsonString());
 			await socket.SendAsync(payload, WebSocketMessageType.Text, true, ct);
