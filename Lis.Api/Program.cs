@@ -19,6 +19,8 @@ using Lis.Providers.OpenAi.Codex;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -61,18 +63,6 @@ builder.Services.AddOpenTelemetry()
 	   });
 		   tracing.AddSource("Microsoft.SemanticKernel*");
 		   tracing.AddSource(TraceAspect.ActivitySource.Name);
-
-		   // Opik LLM observability (sends GenAI traces to Opik via OTLP)
-		   if (Env("OPIK_ENABLED") == "true") {
-			   tracing.AddOtlpExporter("opik", options => {
-				   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
-				   options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-
-				   string headers = Env("OPIK_OTLP_HEADERS");
-				   if (headers.Length > 0)
-					   options.Headers = headers;
-			   });
-		   }
 	   })
 	   .WithLogging(logging => logging.AddOtlpExporter())
 	   .UseGrafana();
@@ -80,6 +70,20 @@ builder.Logging.AddOpenTelemetry(logging => {
 	logging.IncludeFormattedMessage = true;
 	logging.IncludeScopes           = true;
 });
+
+// Opik LLM observability — separate provider, only GenAI spans
+if (Env("OPIK_ENABLED") == "true") {
+	Sdk.CreateTracerProviderBuilder()
+	   .ConfigureResource(rb => rb.AddService("lis", serviceNamespace: "lis"))
+	   .AddSource("Microsoft.SemanticKernel*")
+	   .AddOtlpExporter(options => {
+		   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
+		   options.Protocol = OtlpExportProtocol.HttpProtobuf;
+		   string headers = Env("OPIK_OTLP_HEADERS");
+		   if (headers.Length > 0) options.Headers = headers;
+	   })
+	   .Build();
+}
 
 // Configuration
 builder.Services.AddSingleton(Options.Create(new LisOptions {
