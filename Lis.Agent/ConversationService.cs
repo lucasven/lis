@@ -605,6 +605,11 @@ public sealed class ConversationService(
 			return $"🔐 Authentication error for provider '{agent.Provider}'. Check your API credentials.";
 		}
 
+		// Codex stream/response errors (e.g. expired session, API-level failures)
+		if (ex is InvalidOperationException && msg.StartsWith("Codex ", StringComparison.Ordinal)) {
+			return $"⚠️ Something went wrong with provider '{agent.Provider}': {msg}. Try again or use /auth codex if the issue persists.";
+		}
+
 		return null;
 	}
 

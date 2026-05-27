@@ -167,17 +167,30 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 
 				case "response.failed": {
 					string errorMsg = "Codex response failed";
+					string? errorCode = null;
 					if (evt.TryGetProperty("response", out JsonElement resp)
-					    && resp.TryGetProperty("error", out JsonElement err)
-					    && err.TryGetProperty("message", out JsonElement msg))
-						errorMsg = msg.GetString() ?? errorMsg;
+					    && resp.TryGetProperty("error", out JsonElement err)) {
+						if (err.TryGetProperty("message", out JsonElement msg))
+							errorMsg = msg.GetString() ?? errorMsg;
+						if (err.TryGetProperty("code", out JsonElement codeProp))
+							errorCode = codeProp.GetString();
+					}
+
+					if (IsAuthError(errorCode, errorMsg))
+						throw new CodexAuthException(errorMsg);
 					throw new InvalidOperationException(errorMsg);
 				}
 
 				case "error": {
 					string errorMsg = "Codex stream error";
+					string? errorCode = null;
 					if (evt.TryGetProperty("message", out JsonElement msg))
 						errorMsg = msg.GetString() ?? errorMsg;
+					if (evt.TryGetProperty("code", out JsonElement codeProp))
+						errorCode = codeProp.GetString();
+
+					if (IsAuthError(errorCode, errorMsg))
+						throw new CodexAuthException(errorMsg);
 					throw new InvalidOperationException(errorMsg);
 				}
 
@@ -238,6 +251,13 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 		["originator"]          = "lis",
 		["User-Agent"]          = $"lis ({Environment.OSVersion.Platform})"
 	};
+
+	private static bool IsAuthError(string? code, string message) =>
+		code is "authentication_error" or "invalid_api_key" or "token_expired"
+		|| message.Contains("auth", StringComparison.OrdinalIgnoreCase)
+		|| message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
+		|| message.Contains("token", StringComparison.OrdinalIgnoreCase)
+		   && message.Contains("expired", StringComparison.OrdinalIgnoreCase);
 
 	private static UsageDetails ExtractUsageDetails(JsonElement usage) {
 		int inputTokens  = usage.TryGetProperty("input_tokens", out JsonElement inp) ? inp.GetInt32() : 0;
