@@ -51,8 +51,7 @@ public static class AnthropicProvider {
 			Model = opts.Model, MaxTokens = opts.MaxTokens,
 			ContextBudget = opts.ContextBudget, ThinkingEffort = opts.ThinkingEffort
 		});
-		services.AddSingleton<IChatClient>(anthropic.Messages.AsBuilder()
-			.UseOpenTelemetry(sourceName: "anthropic", configure: o => o.EnableSensitiveData = true).Build());
+		services.AddSingleton<IChatClient>(anthropic.Messages);
 		services.AddSingleton<IUsageExtractor, AnthropicUsageExtractor>();
 
 		// Token counter (free endpoint for accurate post-compaction counts)

@@ -8,6 +8,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Lis.Core.Channel;
 using Lis.Core.Configuration;
+using Lis.Core.Observability;
 using Lis.Core.Util;
 using Lis.Persistence;
 using Lis.Persistence.Entities;
@@ -19,8 +20,6 @@ using Lis.Providers.OpenAi.Codex;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
-using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -71,21 +70,17 @@ builder.Logging.AddOpenTelemetry(logging => {
 	logging.IncludeScopes           = true;
 });
 
-// Opik LLM observability — separate provider, only GenAI spans
+// Opik LLM observability (native REST client)
 if (Env("OPIK_ENABLED") == "true") {
-	Sdk.CreateTracerProviderBuilder()
-	   .ConfigureResource(rb => rb.AddService("lis", serviceNamespace: "lis"))
-	   .AddSource("Microsoft.SemanticKernel*")
-	   .AddSource("codex")
-	   .AddSource("anthropic")
-	   .AddSource(TraceAspect.ActivitySource.Name)
-	   .AddOtlpExporter(options => {
-		   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
-		   options.Protocol = OtlpExportProtocol.HttpProtobuf;
-		   string headers = Env("OPIK_OTLP_HEADERS");
-		   if (headers.Length > 0) options.Headers = headers;
-	   })
-	   .Build();
+	OpikOptions opikOpts = new() {
+		BaseUrl   = Env("OPIK_BASE_URL") is { Length: > 0 } u ? u : "https://www.comet.com/opik",
+		ApiKey    = Env("OPIK_API_KEY") is { Length: > 0 } k ? k : null,
+		Workspace = Env("OPIK_WORKSPACE") is { Length: > 0 } w ? w : null,
+		Project   = Env("OPIK_PROJECT") is { Length: > 0 } proj ? proj : "lis"
+	};
+	builder.Services.AddSingleton(new OpikClient(opikOpts));
+	builder.Services.AddScoped<OpikTracer>(sp =>
+		new OpikTracer(sp.GetRequiredService<OpikClient>(), opikOpts.Project, sp.GetRequiredService<ILogger<OpikTracer>>()));
 }
 
 // Configuration
