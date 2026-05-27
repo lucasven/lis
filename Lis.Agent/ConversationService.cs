@@ -517,6 +517,13 @@ public sealed class ConversationService(
 	private static async Task<long> PersistSkMessageAsync(
 		LisDbContext db, ChatEntity chat, SessionEntity session,
 		ChatMessageContent msg, TokenUsage? usage, string? externalId, CancellationToken ct) {
+		string? skContent;
+		try {
+			skContent = JsonSerializer.Serialize(msg);
+		} catch (NotSupportedException) {
+			skContent = JsonSerializer.Serialize(new { role = msg.Role.Label, content = msg.Content });
+		}
+
 		MessageEntity entity = new() {
 			ExternalId          = externalId,
 			ChatId              = chat.Id,
@@ -525,7 +532,7 @@ public sealed class ConversationService(
 			IsFromMe            = msg.Role != AuthorRole.User,
 			Role                = msg.Role.Label,
 			Body                = msg.Content,
-			SkContent           = JsonSerializer.Serialize(msg),
+			SkContent           = skContent,
 			InputTokens         = usage?.InputTokens,
 			OutputTokens        = usage?.OutputTokens,
 			CacheReadTokens     = usage?.CacheReadTokens,
