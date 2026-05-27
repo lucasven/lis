@@ -3,6 +3,7 @@ using Lis.Core.Observability;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace Lis.Agent;
 
@@ -26,8 +27,18 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		};
 	}
 
-	public void StartLlmSpan(string model, string provider) {
+	public void StartLlmSpan(string model, string provider, ChatHistory? history = null) {
 		if (this._trace is null) return;
+
+		object? input = null;
+		if (history is not null) {
+			input = new {
+				messages = history.Select(m => new {
+					role    = m.Role.Label,
+					content = m.Content?[..Math.Min(m.Content.Length, 2000)]
+				}).ToList()
+			};
+		}
 
 		this._currentLlmSpan = new OpikSpan {
 			Id          = Guid.NewGuid().ToString(),
@@ -36,6 +47,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			Name        = $"chat {model}",
 			Type        = "llm",
 			StartTime   = Now(),
+			Input       = input,
 			Model       = model,
 			Provider    = provider
 		};

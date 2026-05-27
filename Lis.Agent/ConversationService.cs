@@ -306,7 +306,7 @@ public sealed class ConversationService(
 				// Opik: track LLM and tool spans
 				if (msg.Role == AuthorRole.Assistant) {
 					if (msgUsage is not null) opikTracer?.EndLlmSpan(msg, msgUsage);
-					else opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider);
+					else opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider, chatHistory);
 				}
 
 				if (msg.Role == AuthorRole.Tool) {
