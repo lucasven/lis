@@ -14,22 +14,31 @@ Add file/image sending support to the Mattermost channel. Two-step flow: upload 
 
 ## Design
 
-### 1. MediaDownload — extend with optional Filename
+### 1. OutgoingMedia — new record extending MediaDownload
+
+`MediaDownload` stays unchanged (used for receiving). New `OutgoingMedia` extends it with an optional `Filename` for sending:
 
 ```csharp
-public sealed record MediaDownload(byte[] Data, string MimeType, string? Filename = null);
+// Existing — unchanged
+public record MediaDownload(byte[] Data, string MimeType);
+
+// New — for outbound files
+public sealed record OutgoingMedia(byte[] Data, string MimeType, string? Filename = null)
+    : MediaDownload(Data, MimeType);
 ```
 
-When `Filename` is null, a default `file.{ext}` is derived from MimeType (e.g. `image/png` → `file.png`).
+When `Filename` is null, a default `file.{ext}` is derived from MimeType using the `MimeTypes` library.
+
+`MediaDownload` is unsealed (was `sealed`) to allow inheritance.
 
 ### 2. IChannelClient — add SendFileAsync
 
 ```csharp
-Task<string?> SendFileAsync(string chatId, MediaDownload media,
+Task<string?> SendFileAsync(string chatId, OutgoingMedia media,
     string? caption = null, string? replyToId = null, CancellationToken ct = default);
 ```
 
-Returns external message ID. Caption becomes the post text alongside the attachment (single post with both).
+Returns external message ID. Caption becomes the post text alongside the attachment (single post with both text and file).
 
 ### 3. MattermostApiClient — two changes
 
@@ -37,14 +46,20 @@ Returns external message ID. Caption becomes the post text alongside the attachm
 - `POST /api/v4/files` as `multipart/form-data`
 - Fields: `channel_id` (string), `files` (binary with filename)
 - Returns `string[]` of file IDs from the response
+- Upload only stores the file server-side; it is NOT visible in chat until attached to a post
 
-**Extend: CreatePostAsync**
-- Add optional `string[]? fileIds` parameter
-- When present, include `file_ids` array in the JSON body
+**Extend: CreatePostAsync with file_ids**
+
+The Mattermost `Post` model supports a `file_ids` field. After uploading via `UploadFileAsync`, the returned file IDs are passed to `CreatePostAsync` to attach them to a message.
+
+- Add optional `string[]? fileIds` parameter to `CreatePostAsync`
+- When present, include `file_ids` array in the JSON payload alongside `channel_id`, `message`, and `root_id`
 
 ### 4. MattermostClient.SendFileAsync
 
-Implementation: upload via `UploadFileAsync`, then create post via `CreatePostAsync` with `file_ids` + caption text.
+1. Upload file via `UploadFileAsync` → get file IDs
+2. Create post via `CreatePostAsync` with `file_ids` + caption as message text
+3. Result: single post in chat with both the attached file and the caption
 
 ### 5. SendFilePlugin — agent tool
 
@@ -58,25 +73,27 @@ public async Task<string> SendFileAsync(
 ```
 
 - Uses `ResolveSafePath` pattern (same as `FileSystemPlugin`) — jailed to agent workspace
-- Reads file from disk, infers MIME type from extension if not provided
-- Calls `ToolContext.Channel.SendFileAsync` with the data
+- Reads file from disk
+- Infers MIME type from file extension via `MimeTypes` library if not provided
+- Calls `ToolContext.Channel.SendFileAsync` with `OutgoingMedia` + caption
 - Returns confirmation message to agent
 
 ### 6. WhatsApp
 
 `SendFileAsync` throws `NotSupportedException` for now.
 
-### 7. MIME type → extension mapping
+### 7. MIME type handling — MimeTypes NuGet package
 
-Simple static helper for common types:
-- `image/png` → `.png`
-- `image/jpeg` → `.jpg`
-- `image/gif` → `.gif`
-- `image/webp` → `.webp`
-- `application/pdf` → `.pdf`
-- Fallback: `.bin`
+Add `MimeTypes` source-only NuGet package to `Lis.Core`. It compiles into the assembly (zero runtime deps) and provides:
 
-Also reverse: extension → MIME type for `SendFilePlugin` auto-detection.
+- `MimeTypes.GetMimeType("file.png")` → `"image/png"` (extension → MIME)
+- `MimeTypes.GetMimeTypeExtensions("image/png")` → `[".png"]` (MIME → extension)
+
+Database sourced from mime-db (IANA + Apache + nginx). Covers all common types: images, PDFs, HTML, Markdown, archives, etc. No hand-rolled mapping needed.
+
+Used in:
+- `OutgoingMedia`: derive default filename extension from MimeType
+- `SendFilePlugin`: auto-detect MIME type from file extension
 
 ## Security
 
