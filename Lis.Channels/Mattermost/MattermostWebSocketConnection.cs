@@ -19,6 +19,8 @@ public sealed class MattermostWebSocketConnection(
 	private ClientWebSocket? _socket;
 	private int              _seq;
 
+	private static readonly TimeSpan KeepAliveInterval = TimeSpan.FromSeconds(30);
+
 	public bool IsConnected => this._socket?.State == WebSocketState.Open;
 
 	public MattermostBotConfig BotConfig => botConfig;
@@ -29,6 +31,7 @@ public sealed class MattermostWebSocketConnection(
 
 		this._seq    = 0;
 		this._socket = new ClientWebSocket();
+		this._socket.Options.KeepAliveInterval = KeepAliveInterval;
 
 		Uri wsUri = BuildWebSocketUri(baseUrl);
 

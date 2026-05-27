@@ -18,9 +18,8 @@ public sealed class MattermostWebSocketService(
 	ILoggerFactory                           loggerFactory,
 	ILogger<MattermostWebSocketService>      logger) : BackgroundService {
 
-	private static readonly TimeSpan InitialBackoff   = TimeSpan.FromSeconds(1);
-	private static readonly TimeSpan MaxBackoff       = TimeSpan.FromSeconds(60);
-	private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(60);
+	private static readonly TimeSpan InitialBackoff = TimeSpan.FromSeconds(1);
+	private static readonly TimeSpan MaxBackoff     = TimeSpan.FromSeconds(60);
 
 	private readonly Dictionary<string, MattermostWebSocketConnection> _connections = new();
 
@@ -73,18 +72,7 @@ public sealed class MattermostWebSocketService(
 		MattermostWebSocketConnection connection, MattermostBotConfig bot, CancellationToken ct) {
 
 		while (!ct.IsCancellationRequested && connection.IsConnected) {
-			using CancellationTokenSource heartbeat = CancellationTokenSource.CreateLinkedTokenSource(ct);
-			heartbeat.CancelAfter(HeartbeatTimeout);
-
-			JsonDocument? msg;
-			try {
-				msg = await connection.ReceiveAsync(heartbeat.Token);
-			} catch (OperationCanceledException) when (!ct.IsCancellationRequested) {
-				logger.LogWarning("No message received for {BotName} in {Timeout}s, reconnecting",
-					bot.AgentName, HeartbeatTimeout.TotalSeconds);
-				return;
-			}
-
+			JsonDocument? msg = await connection.ReceiveAsync(ct);
 			if (msg is null) return;
 
 			using (msg) {
