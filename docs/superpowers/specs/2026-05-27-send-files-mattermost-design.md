@@ -14,16 +14,16 @@ Add file/image sending support to the Mattermost channel. Two-step flow: upload 
 
 ## Design
 
-### 1. OutgoingMedia — new record extending MediaDownload
+### 1. MediaUpload — new record extending MediaDownload
 
-`MediaDownload` stays unchanged (used for receiving). New `OutgoingMedia` extends it with an optional `Filename` for sending:
+`MediaDownload` stays unchanged (used for receiving). New `MediaUpload` extends it with an optional `Filename` for sending:
 
 ```csharp
 // Existing — unchanged
 public record MediaDownload(byte[] Data, string MimeType);
 
 // New — for outbound files
-public sealed record OutgoingMedia(byte[] Data, string MimeType, string? Filename = null)
+public sealed record MediaUpload(byte[] Data, string MimeType, string? Filename = null)
     : MediaDownload(Data, MimeType);
 ```
 
@@ -34,7 +34,7 @@ When `Filename` is null, a default `file.{ext}` is derived from MimeType using t
 ### 2. IChannelClient — add SendFileAsync
 
 ```csharp
-Task<string?> SendFileAsync(string chatId, OutgoingMedia media,
+Task<string?> SendFileAsync(string chatId, MediaUpload media,
     string? caption = null, string? replyToId = null, CancellationToken ct = default);
 ```
 
@@ -57,9 +57,11 @@ The Mattermost `Post` model supports a `file_ids` field. After uploading via `Up
 
 ### 4. MattermostClient.SendFileAsync
 
-1. Upload file via `UploadFileAsync` → get file IDs
-2. Create post via `CreatePostAsync` with `file_ids` + caption as message text
-3. Result: single post in chat with both the attached file and the caption
+The Mattermost upload endpoint (`POST /api/v4/files`) only accepts `channel_id` and the binary file — no caption. The caption is sent as the `message` field in the subsequent `CreatePostAsync` call, which ties everything together:
+
+1. Upload file via `UploadFileAsync(channelId, filename, data, contentType)` → returns file IDs
+2. Create post via `CreatePostAsync(channelId, message: caption, fileIds: [...], replyToId)` → the `message` field carries the caption, `file_ids` attaches the uploaded file
+3. Result: single post in chat with both the attached file and the caption text
 
 ### 5. SendFilePlugin — agent tool
 
@@ -75,7 +77,7 @@ public async Task<string> SendFileAsync(
 - Uses `ResolveSafePath` pattern (same as `FileSystemPlugin`) — jailed to agent workspace
 - Reads file from disk
 - Infers MIME type from file extension via `MimeTypes` library if not provided
-- Calls `ToolContext.Channel.SendFileAsync` with `OutgoingMedia` + caption
+- Calls `ToolContext.Channel.SendFileAsync` with `MediaUpload` + caption
 - Returns confirmation message to agent
 
 ### 6. WhatsApp
@@ -92,7 +94,7 @@ Add `MimeTypes` source-only NuGet package to `Lis.Core`. It compiles into the as
 Database sourced from mime-db (IANA + Apache + nginx). Covers all common types: images, PDFs, HTML, Markdown, archives, etc. No hand-rolled mapping needed.
 
 Used in:
-- `OutgoingMedia`: derive default filename extension from MimeType
+- `MediaUpload`: derive default filename extension from MimeType
 - `SendFilePlugin`: auto-detect MIME type from file extension
 
 ## Security
