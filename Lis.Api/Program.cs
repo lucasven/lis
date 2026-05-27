@@ -78,6 +78,7 @@ if (Env("OPIK_ENABLED") == "true") {
 	   .AddSource("Microsoft.SemanticKernel*")
 	   .AddSource("codex")
 	   .AddSource("anthropic")
+	   .AddSource(TraceAspect.ActivitySource.Name)
 	   .AddOtlpExporter(options => {
 		   options.Endpoint = new Uri(Env("OPIK_OTLP_ENDPOINT"));
 		   options.Protocol = OtlpExportProtocol.HttpProtobuf;
