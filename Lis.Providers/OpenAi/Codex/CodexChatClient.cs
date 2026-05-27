@@ -176,9 +176,7 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 							errorCode = codeProp.GetString();
 					}
 
-					if (IsAuthError(errorCode, errorMsg))
-						throw new CodexAuthException(errorMsg);
-					throw new InvalidOperationException(errorMsg);
+					throw BuildStreamException(errorCode, errorMsg, evt);
 				}
 
 				case "error": {
@@ -189,9 +187,7 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 					if (evt.TryGetProperty("code", out JsonElement codeProp))
 						errorCode = codeProp.GetString();
 
-					if (IsAuthError(errorCode, errorMsg))
-						throw new CodexAuthException(errorMsg);
-					throw new InvalidOperationException(errorMsg);
+					throw BuildStreamException(errorCode, errorMsg, evt);
 				}
 
 				// reasoning events — not surfaced to caller
@@ -251,6 +247,15 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 		["originator"]          = "lis",
 		["User-Agent"]          = $"lis ({Environment.OSVersion.Platform})"
 	};
+
+	private static Exception BuildStreamException(string? code, string message, JsonElement rawEvent) {
+		string raw = rawEvent.GetRawText();
+		string fullMsg = raw.Length > 2 && raw != "{}" ? $"{message} | raw: {raw}" : message;
+
+		if (IsAuthError(code, message))
+			return new CodexAuthException(fullMsg);
+		return new InvalidOperationException(fullMsg);
+	}
 
 	private static bool IsAuthError(string? code, string message) =>
 		code is "authentication_error" or "invalid_api_key" or "token_expired"

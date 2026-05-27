@@ -607,7 +607,10 @@ public sealed class ConversationService(
 
 		// Codex stream/response errors (e.g. expired session, API-level failures)
 		if (ex is InvalidOperationException && msg.StartsWith("Codex ", StringComparison.Ordinal)) {
-			return $"⚠️ Something went wrong with provider '{agent.Provider}': {msg}. Try again or use /auth codex if the issue persists.";
+			// Strip raw JSON payload from user-facing message (kept in logs via exception)
+			int rawIdx = msg.IndexOf(" | raw:", StringComparison.Ordinal);
+			string userMsg = rawIdx > 0 ? msg[..rawIdx] : msg;
+			return $"⚠️ Something went wrong with provider '{agent.Provider}': {userMsg}. Try again or use /auth codex if the issue persists.";
 		}
 
 		return null;
