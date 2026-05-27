@@ -231,8 +231,12 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 			? new CodexReasoningOptions { Effort = codexOptions.ReasoningEffort }
 			: null;
 
+		string model = !string.IsNullOrEmpty(options?.ModelId) ? options.ModelId : codexOptions.Model;
+		int slash = model.IndexOf('/');
+		if (slash >= 0) model = model[(slash + 1)..];
+
 		return new CodexRequest {
-			Model              = !string.IsNullOrEmpty(options?.ModelId) ? options.ModelId : codexOptions.Model,
+			Model              = model,
 			Instructions       = instructions ?? "",
 			Input              = input,
 			Tools              = tools,

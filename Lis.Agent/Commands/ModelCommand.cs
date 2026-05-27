@@ -18,8 +18,7 @@ public sealed class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppres
 		if (ctx.Args is null or { Length: 0 })
 			return $"🧠 Current model: {ctx.Agent.Model} (provider: {ctx.Agent.Provider})";
 
-		string model    = ctx.Args.Trim();
-		string provider = DetectProvider(model) ?? ctx.Agent.Provider;
+		(string provider, string model) = ParseModel(ctx.Args.Trim(), ctx.Agent.Provider);
 
 		ctx.Agent.Model     = model;
 		ctx.Agent.Provider  = provider;
@@ -31,8 +30,22 @@ public sealed class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppres
 		return $"✅ Model updated to '{model}' (provider: {provider}).";
 	}
 
+	internal static (string Provider, string Model) ParseModel(string input, string currentProvider) {
+		// Explicit provider/model format (e.g. "codex/gpt-5.4", "anthropic/claude-opus-4-6")
+		int slash = input.IndexOf('/');
+		if (slash > 0 && slash < input.Length - 1) {
+			string prefix = input[..slash];
+			string model  = input[(slash + 1)..];
+			return (prefix, model);
+		}
+
+		// Infer provider from model name pattern
+		string provider = DetectProvider(input) ?? currentProvider;
+		return (provider, input);
+	}
+
 	internal static string? DetectProvider(string model) {
-		if (Regex.IsMatch(model, @"^(claude-|anthropic/)", RegexOptions.IgnoreCase))
+		if (Regex.IsMatch(model, @"^(claude-)", RegexOptions.IgnoreCase))
 			return "anthropic";
 		if (Regex.IsMatch(model, @"^(gpt-|codex-|o[13]-|o[13]p-|chatgpt-)", RegexOptions.IgnoreCase))
 			return "codex";
