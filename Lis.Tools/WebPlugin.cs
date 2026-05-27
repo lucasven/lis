@@ -7,11 +7,12 @@ using System.Web;
 
 using Lis.Core.Util;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
 namespace Lis.Tools;
 
-public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory) {
+public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory, ILogger<WebPlugin> logger) {
 
 	[KernelFunction("search")]
 	[Description("Search the web via Brave Search. Returns titles, URLs, and text snippets for matching results. Use web-fetch to read full page content from a result URL.")]
@@ -68,6 +69,7 @@ public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory) {
 			string output = sb.ToString().TrimEnd();
 			return output.Length > 0 ? output : "No results found.";
 		} catch (Exception ex) {
+			logger.LogWarning(ex, "Web search failed for query '{Query}'", query);
 			return $"Search error: {ex.Message}";
 		}
 	}
@@ -104,6 +106,7 @@ public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory) {
 
 			return text;
 		} catch (Exception ex) {
+			logger.LogWarning(ex, "Web fetch failed for URL '{Url}'", url);
 			return $"Fetch error: {ex.Message}";
 		}
 	}

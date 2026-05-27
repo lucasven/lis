@@ -46,7 +46,9 @@ public sealed class CodexTokenManager : IDisposable {
 		try {
 			(string accountId, DateTimeOffset expiresAt) = ParseJwt(accessToken);
 			this._cached = new CodexTokenInfo(accessToken, accountId, expiresAt);
-		} catch {
+		} catch (Exception ex) {
+			System.Diagnostics.Activity.Current?.SetStatus(
+				System.Diagnostics.ActivityStatusCode.Error, $"JWT parse failed after token update: {ex.Message}");
 			this._cached = null;
 		}
 	}

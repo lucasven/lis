@@ -5,6 +5,7 @@ using Lis.Persistence.Entities;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Pgvector;
@@ -16,6 +17,7 @@ public sealed class ResumeCommand(
 	CompactionService                            compactionService,
 	ModelSettings                                modelSettings,
 	IOptions<LisOptions>                         lisOptions,
+	ILogger<ResumeCommand>                       logger,
 	IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator = null) : IChatCommand {
 
 	public string[] Triggers => ["/resume"];
@@ -56,8 +58,8 @@ public sealed class ResumeCommand(
 				_ = Task.Run(async () => {
 					try {
 						await compactionService.GenerateSessionSummaryAsync(oldSessionId, CancellationToken.None);
-					} catch {
-						// Best effort
+					} catch (Exception ex) {
+						logger.LogWarning(ex, "Failed to generate summary for session #{SessionId}", oldSessionId);
 					}
 				}, CancellationToken.None);
 			}

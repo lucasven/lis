@@ -64,7 +64,8 @@ public sealed class MattermostApiClient(HttpClient http) {
 	[Trace("MattermostApiClient > ViewChannelAsync")]
 	public async Task ViewChannelAsync(string userId, string channelId, CancellationToken ct = default) {
 		HttpResponseMessage response = await http.PostAsJsonAsync(
-			$"/api/v4/channels/members/{userId}/{channelId}/view", new { }, ct);
+			$"/api/v4/channels/members/{userId}/view",
+			new { channel_id = channelId, collapsed_threads_supported = true }, ct);
 		response.EnsureSuccessStatusCode();
 	}
 }

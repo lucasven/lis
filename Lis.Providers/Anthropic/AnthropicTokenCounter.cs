@@ -3,13 +3,15 @@ using System.Text.Json.Nodes;
 
 using Lis.Core.Channel;
 
+using Microsoft.Extensions.Logging;
+
 namespace Lis.Providers.Anthropic;
 
 /// <summary>
 /// Counts tokens using Anthropic's free /v1/messages/count_tokens endpoint.
 /// Takes a pre-built JSON request body (same format as /v1/messages) and returns input_tokens.
 /// </summary>
-public sealed class AnthropicTokenCounter(HttpClient httpClient) : ITokenCounter {
+public sealed class AnthropicTokenCounter(HttpClient httpClient, ILogger<AnthropicTokenCounter>? logger = null) : ITokenCounter {
 	private const string Endpoint = "https://api.anthropic.com/v1/messages/count_tokens";
 
 	public async Task<int?> CountAsync(string requestBodyJson, CancellationToken ct = default) {
@@ -19,7 +21,8 @@ public sealed class AnthropicTokenCounter(HttpClient httpClient) : ITokenCounter
 			response.EnsureSuccessStatusCode();
 			string json = await response.Content.ReadAsStringAsync(ct);
 			return JsonNode.Parse(json)?["input_tokens"]?.GetValue<int>();
-		} catch {
+		} catch (Exception ex) {
+			logger?.LogWarning(ex, "Token counting failed");
 			return null;
 		}
 	}
