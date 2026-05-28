@@ -61,9 +61,17 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		object? input = null;
 		if (history is not null) {
 			input = new {
-				messages = history.Select(m => new {
-					role    = m.Role.Label,
-					content = m.Content is { } c ? c[..Math.Min(c.Length, 2000)] : null
+				messages = history.Select(m => {
+					string? text = m.Content;
+					if (string.IsNullOrEmpty(text)) {
+						// SK may store content in Items (e.g. TextContent) instead of .Content
+						text = string.Join("", m.Items.OfType<TextContent>().Select(t => t.Text));
+					}
+					if (string.IsNullOrEmpty(text)) text = null;
+					return new {
+						role    = m.Role.Label,
+						content = text is { } c ? c[..Math.Min(c.Length, 2000)] : null
+					};
 				}).ToList()
 			};
 		}
