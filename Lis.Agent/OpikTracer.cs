@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using Lis.Core.Channel;
 using Lis.Core.Observability;
 
@@ -16,10 +18,33 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 
 	private static string Now() => DateTimeOffset.UtcNow.ToString("O");
 
+	/// <summary>Generate a UUID v7 (time-ordered) as required by Opik API.</summary>
+	private static string NewUuidV7() {
+		Span<byte> bytes = stackalloc byte[16];
+
+		// First 6 bytes: Unix timestamp in milliseconds (big-endian)
+		long ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+		bytes[0] = (byte)(ms >> 40);
+		bytes[1] = (byte)(ms >> 32);
+		bytes[2] = (byte)(ms >> 24);
+		bytes[3] = (byte)(ms >> 16);
+		bytes[4] = (byte)(ms >> 8);
+		bytes[5] = (byte)ms;
+
+		// Remaining 10 bytes: random
+		RandomNumberGenerator.Fill(bytes[6..]);
+
+		// Set version (0111) and variant (10xx) bits
+		bytes[6] = (byte)((bytes[6] & 0x0F) | 0x70); // version 7
+		bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80); // variant 1
+
+		return new Guid(bytes, bigEndian: true).ToString();
+	}
+
 	public void StartTrace(string chatId, string agentName, string provider, string model, long sessionId, IncomingMessage message) {
 		this._trace = new OpikTrace {
-			Id          = Guid.NewGuid().ToString(),
-			Name        = agentName,
+			Id          = NewUuidV7(),
+			Name    = agentName,
 			ProjectName = project,
 			ThreadId    = chatId,
 			StartTime   = Now(),
@@ -43,11 +68,11 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		}
 
 		this._currentLlmSpan = new OpikSpan {
-			Id          = Guid.NewGuid().ToString(),
+			Id     = NewUuidV7(),
 			TraceId     = this._trace.Id,
 			ProjectName = project,
 			Name        = $"chat {model}",
-			Type        = "llm",
+			Type   = "llm",
 			StartTime   = Now(),
 			Input       = input,
 			Model       = model,
@@ -63,7 +88,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 
 		if (usage is not null) {
 			this._currentLlmSpan.Usage = new OpikUsage {
-				PromptTokens     = usage.TotalInputTokens,
+				PromptTokens = usage.TotalInputTokens,
 				CompletionTokens = usage.OutputTokens,
 				TotalTokens      = usage.TotalInputTokens + usage.OutputTokens
 			};
@@ -81,16 +106,16 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		string? parentId = this._lastLlmSpanId;
 
 		this._spans.Add(new OpikSpan {
-			Id           = Guid.NewGuid().ToString(),
+			Id           = NewUuidV7(),
 			TraceId      = this._trace.Id,
 			ParentSpanId = parentId,
 			ProjectName  = project,
-			Name         = $"tool {call.FunctionName}",
+			Name      = $"tool {call.FunctionName}",
 			Type         = "tool",
 			StartTime    = this._toolBatchStart.ToString("O"),
 			EndTime      = Now(),
 			Input        = new { name = call.FunctionName, plugin = call.PluginName, arguments = call.Arguments },
-			Output       = new { result = result.Result?.ToString() }
+			Output    = new { result = result.Result?.ToString() }
 		});
 	}
 
@@ -121,8 +146,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			if (this._spans.Count > 0)
 				await client.SendSpansAsync(this._spans);
 		} catch (Exception ex) {
-			if (logger.IsEnabled(LogLevel.Debug))
-				logger.LogDebug(ex, "Failed to send Opik trace {TraceId}", this._trace.Id);
+			logger.LogWarning(ex, "Failed to send Opik trace {TraceId}", this._trace.Id);
 		}
 	}
 }
