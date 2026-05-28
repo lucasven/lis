@@ -13,7 +13,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 	private OpikTrace?_trace;
 	private OpikSpan?   _currentLlmSpan;
 	private string?            _lastLlmSpanId;
-	private DateTimeOffset _toolBatchStart;
+	private DateTimeOffset _toolBatchStart = DateTimeOffset.UtcNow;
 	private readonly List<OpikSpan> _spans = [];
 
 	private const string Iso = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
@@ -147,7 +147,9 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			if (this._spans.Count > 0)
 				await client.SendSpansAsync(this._spans);
 		} catch (Exception ex) {
-			logger.LogWarning(ex, "Failed to send Opik trace {TraceId}", this._trace.Id);
+			var times = this._spans.Select(s => $"{s.Name}: start={s.StartTime} end={s.EndTime}");
+			logger.LogWarning(ex, "Failed to send Opik trace {TraceId}. Span times: {SpanTimes}",
+				this._trace.Id, string.Join(" | ", times));
 		}
 	}
 }

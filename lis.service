@@ -1,0 +1,22 @@
+[Unit]
+Description=Lis API
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=agenticcompany
+Group=agenticcompany
+WorkingDirectory=/home/agenticcompany/lis
+ExecStart=/home/agenticcompany/.dotnet/dotnet /home/agenticcompany/lis/publish/Lis.Api.dll
+Environment=DOTNET_ROOT=/home/agenticcompany/.dotnet
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=lis
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
