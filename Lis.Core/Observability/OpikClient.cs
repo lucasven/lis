@@ -75,14 +75,20 @@ public sealed class OpikClient : IDisposable {
 		if (traces.Count == 0) return;
 		HttpResponseMessage resp = await this._http.PostAsJsonAsync("api/v1/private/traces/batch",
 			new { traces }, JsonOpts, ct);
-		resp.EnsureSuccessStatusCode();
+		await EnsureSuccessOrThrowWithBody(resp);
 	}
 
 	public async Task SendSpansAsync(IReadOnlyList<OpikSpan> spans, CancellationToken ct = default) {
 		if (spans.Count == 0) return;
 		HttpResponseMessage resp = await this._http.PostAsJsonAsync("api/v1/private/spans/batch",
 			new { spans }, JsonOpts, ct);
-		resp.EnsureSuccessStatusCode();
+		await EnsureSuccessOrThrowWithBody(resp);
+	}
+
+	private static async Task EnsureSuccessOrThrowWithBody(HttpResponseMessage resp) {
+		if (resp.IsSuccessStatusCode) return;
+		string body = await resp.Content.ReadAsStringAsync();
+		throw new HttpRequestException($"Opik API {(int)resp.StatusCode}: {body}");
 	}
 
 	public void Dispose() => this._http.Dispose();
