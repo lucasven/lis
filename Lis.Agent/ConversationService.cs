@@ -291,6 +291,7 @@ public sealed class ConversationService(
 		string?     lastAssistantText = null;
 
 		try {
+			opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider, chatHistory);
 			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
 				string? externalId = null;
 				if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content)) {
