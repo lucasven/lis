@@ -10,13 +10,14 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace Lis.Agent;
 
 public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTracer> logger) {
-	private OpikTrace?         _trace;
-	private OpikSpan?          _currentLlmSpan;
+	private OpikTrace?_trace;
+	private OpikSpan?   _currentLlmSpan;
 	private string?            _lastLlmSpanId;
-	private DateTimeOffset     _toolBatchStart;
+	private DateTimeOffset _toolBatchStart;
 	private readonly List<OpikSpan> _spans = [];
 
-	private static string Now() => DateTimeOffset.UtcNow.ToString("O");
+	private const string Iso = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
+	private static string Now() => DateTimeOffset.UtcNow.ToString(Iso);
 
 	/// <summary>Generate a UUID v7 (time-ordered) as required by Opik API.</summary>
 	private static string NewUuidV7() {
@@ -43,7 +44,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 
 	public void StartTrace(string chatId, string agentName, string provider, string model, long sessionId, IncomingMessage message) {
 		this._trace = new OpikTrace {
-			Id          = NewUuidV7(),
+			Id       = NewUuidV7(),
 			Name    = agentName,
 			ProjectName = project,
 			ThreadId    = chatId,
@@ -71,7 +72,7 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 			Id     = NewUuidV7(),
 			TraceId     = this._trace.Id,
 			ProjectName = project,
-			Name        = $"chat {model}",
+			Name  = $"chat {model}",
 			Type   = "llm",
 			StartTime   = Now(),
 			Input       = input,
@@ -106,15 +107,15 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 		string? parentId = this._lastLlmSpanId;
 
 		this._spans.Add(new OpikSpan {
-			Id           = NewUuidV7(),
+			Id      = NewUuidV7(),
 			TraceId      = this._trace.Id,
 			ParentSpanId = parentId,
 			ProjectName  = project,
 			Name      = $"tool {call.FunctionName}",
 			Type         = "tool",
-			StartTime    = this._toolBatchStart.ToString("O"),
+			StartTime    = this._toolBatchStart.ToString(Iso),
 			EndTime      = Now(),
-			Input        = new { name = call.FunctionName, plugin = call.PluginName, arguments = call.Arguments },
+			Input   = new { name = call.FunctionName, plugin = call.PluginName, arguments = call.Arguments },
 			Output    = new { result = result.Result?.ToString() }
 		});
 	}
