@@ -39,5 +39,15 @@ jobs:
 
       - name: Health check
         run: |
-          sleep 10
-          curl -sf http://localhost:3010/health || (sudo journalctl -u lis --no-pager -n 30 && exit 1)
+          sleep 15
+          for i in {1..30}; do
+            if curl -sf http://localhost:3010/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i/30 - retrying in 1 second..."
+            sleep 1
+          done
+          echo "Health check failed after 30 attempts"
+          sudo journalctl -u lis --no-pager -n 50
+          exit 1

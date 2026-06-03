@@ -179,14 +179,16 @@ public sealed class A2aClientTests : IDisposable {
 		kernelBuilder.Services.AddSingleton<IChatCompletionService>(chatClient.AsChatCompletionService());
 		Kernel kernel = kernelBuilder.Build();
 
-		services.AddSingleton(kernel);
-		ServiceProvider sp = services.BuildServiceProvider();
-
 		ToolAuthRegistry authRegistry = new();
 		authRegistry.Build(kernel);
 
 		ToolRunner        toolRunner        = new(authRegistry, new FakeApprovalService(), NullLogger<ToolRunner>.Instance);
 		ToolPolicyService toolPolicyService = new();
+
+		services.AddSingleton(kernel);
+		services.AddSingleton(toolRunner);
+		services.AddSingleton(toolPolicyService);
+		ServiceProvider sp = services.BuildServiceProvider();
 
 		PromptComposer composer = new(
 			Options.Create(new LisOptions()),
@@ -195,9 +197,6 @@ public sealed class A2aClientTests : IDisposable {
 		return new A2aClient(
 			sp.GetRequiredService<IServiceScopeFactory>(),
 			sp,
-			kernel,
-			toolRunner,
-			toolPolicyService,
 			composer,
 			NullLogger<A2aClient>.Instance);
 	}
