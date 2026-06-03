@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 using Lis.Agent;
 using Lis.Core.A2A;
+using Lis.Core.Channel;
 using Lis.Core.Configuration;
 using Lis.Core.Util;
 using Lis.Persistence;
@@ -13,6 +14,8 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace Lis.Tests.A2A;
 
@@ -165,10 +168,25 @@ public sealed class A2aClientTests : IDisposable {
 		AgentEntity agent = this._db.Agents.First(a => a.Name == callingAgent);
 		ToolContext.AgentId = agent.Id;
 
+		FakeChatClient chatClient = new(cannedResponse);
+
 		ServiceCollection services = new();
 		services.AddScoped<LisDbContext>(_ => this._db);
-		services.AddKeyedSingleton<IChatClient>("anthropic", new FakeChatClient(cannedResponse));
+		services.AddKeyedSingleton<IChatClient>("anthropic", chatClient);
+		services.AddKeyedSingleton<IUsageExtractor>("anthropic", new FakeUsageExtractor());
+
+		IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
+		kernelBuilder.Services.AddSingleton<IChatCompletionService>(chatClient.AsChatCompletionService());
+		Kernel kernel = kernelBuilder.Build();
+
+		services.AddSingleton(kernel);
 		ServiceProvider sp = services.BuildServiceProvider();
+
+		ToolAuthRegistry authRegistry = new();
+		authRegistry.Build(kernel);
+
+		ToolRunner        toolRunner        = new(authRegistry, new FakeApprovalService(), NullLogger<ToolRunner>.Instance);
+		ToolPolicyService toolPolicyService = new();
 
 		PromptComposer composer = new(
 			Options.Create(new LisOptions()),
@@ -177,6 +195,9 @@ public sealed class A2aClientTests : IDisposable {
 		return new A2aClient(
 			sp.GetRequiredService<IServiceScopeFactory>(),
 			sp,
+			kernel,
+			toolRunner,
+			toolPolicyService,
 			composer,
 			NullLogger<A2aClient>.Instance);
 	}
@@ -216,12 +237,36 @@ public sealed class A2aClientTests : IDisposable {
 		public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
 			IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null,
 			[EnumeratorCancellation] CancellationToken cancellationToken = default) {
-			yield return new ChatResponseUpdate(ChatRole.Assistant, responseText);
+
+			AdditionalPropertiesDictionary metadata = new() {
+				[ToolRunner.UsageMetadataKey] = new TokenUsage(100, 50, 0, 0, 0)
+			};
+
+			yield return new ChatResponseUpdate(ChatRole.Assistant, responseText) { AdditionalProperties = metadata };
 			await Task.CompletedTask;
 		}
 
 		public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
 		public void Dispose() { }
+	}
+
+	private sealed class FakeUsageExtractor : IUsageExtractor {
+		public TokenUsage? Extract(IReadOnlyDictionary<string, object?>? metadata) {
+			if (metadata?.TryGetValue(ToolRunner.UsageMetadataKey, out object? value) == true)
+				return value as TokenUsage;
+			return null;
+		}
+	}
+
+	private sealed class FakeApprovalService : IApprovalService {
+		public Task<ApprovalResult> RequestApprovalAsync(ApprovalRequest request, CancellationToken ct) =>
+			Task.FromResult(new ApprovalResult(ApprovalDecision.Once, "auto"));
+
+		public Task<bool> ResolveAsync(string approvalId, ApprovalDecision decision, string senderJid) =>
+			Task.FromResult(true);
+
+		public Task<bool> ResolveByMessageAsync(string messageExternalId, ApprovalDecision decision, string senderJid) =>
+			Task.FromResult(true);
 	}
 }
