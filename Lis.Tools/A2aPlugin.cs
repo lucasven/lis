@@ -72,6 +72,8 @@ public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client
 			Parts     = [new TextPart { Text = message }],
 		};
 
+		await ToolContext.NotifyAsync($"🤖 *A2A → {targetAgent}:*\n{message}", ct);
+
 		try {
 			A2aTask task = await client.SendMessageAsync(targetAgent, a2aMsg, ct);
 
@@ -79,11 +81,14 @@ public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client
 				string error = task.Status.Message?.Parts
 					.OfType<TextPart>()
 					.FirstOrDefault()?.Text ?? "Unknown error";
+				await ToolContext.NotifyAsync($"❌ *A2A ← {targetAgent}:*\n{error}", ct);
 				return $"Agent '{targetAgent}' failed: {error}";
 			}
 
-			if (task.Artifacts is not { Count: > 0 })
+			if (task.Artifacts is not { Count: > 0 }) {
+				await ToolContext.NotifyAsync($"✅ *A2A ← {targetAgent}:*\n(no response from agent)", ct);
 				return "(no response from agent)";
+			}
 
 			StringBuilder sb = new();
 			foreach (A2aArtifact artifact in task.Artifacts)
@@ -91,7 +96,10 @@ public sealed class A2aPlugin(IAgentCardProvider cardProvider, IA2aClient client
 					if (part is TextPart text)
 						sb.AppendLine(text.Text);
 
-			return sb.ToString().TrimEnd();
+			string result = sb.ToString().TrimEnd();
+			await ToolContext.NotifyAsync($"✅ *A2A ← {targetAgent}:*\n{result}", ct);
+
+			return result;
 		} catch (KeyNotFoundException) {
 			return $"Agent '{targetAgent}' not found. Use list_agents to see available agents.";
 		}

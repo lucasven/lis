@@ -30,10 +30,16 @@ public sealed class SubagentPlugin(ISubagentRunner runner) {
 		if (ToolContext.AgentId is not { } agentId)
 			return "[subagent error] No agent context available";
 
+		await ToolContext.NotifyAsync($"🧠 *Subagent task:*\n{task}", ct);
+
 		SubagentResult result = await runner.RunAsync(new SubagentRequest { Task = task, Model = model }, agentId, ct);
 
-		return result.Status == SubagentStatus.Completed
+		string output = result.Status == SubagentStatus.Completed
 			? result.Result ?? "(no response)"
 			: $"[subagent error] {result.Error}";
+
+		await ToolContext.NotifyAsync($"✅ *Subagent result:*\n{output}", ct);
+
+		return output;
 	}
 }
