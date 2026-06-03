@@ -34,6 +34,11 @@ AppContext.SetSwitch("Microsoft.SemanticKernel.Experimental.GenAI.EnableOTelDiag
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+builder.Host.UseDefaultServiceProvider(options => {
+	options.ValidateScopes  = builder.Environment.IsDevelopment();
+	options.ValidateOnBuild = builder.Environment.IsDevelopment();
+});
+
 // Controllers + JSON serialization
 builder.Services.AddControllers()
 	   .AddApplicationPart(typeof(GowaWebhookController).Assembly)
