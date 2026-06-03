@@ -104,6 +104,6 @@ public static partial class SkillParser {
 		});
 	}
 
-	[GeneratedRegex(@"^[a-z0-9][a-z0-9-]*[a-z0-9]$")]
+	[GeneratedRegex(@"^[a-z0-9][a-z0-9-]*[a-z0-9]$", RegexOptions.NonBacktracking)]
 	private static partial Regex NamePattern();
 }

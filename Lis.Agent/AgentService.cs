@@ -58,7 +58,7 @@ public sealed class AgentService(
 		string triggers = agent.MentionTriggers ?? agent.DisplayName ?? "";
 
 		foreach (string trigger in triggers.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
-			if (Regex.IsMatch(body, $@"\b{Regex.Escape(trigger)}\b", RegexOptions.IgnoreCase)) {
+			if (Regex.IsMatch(body, $@"\b{Regex.Escape(trigger)}\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1))) {
 				message.IsBotMentioned = true;
 				return;
 			}

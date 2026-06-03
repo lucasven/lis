@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 
 namespace Lis.Agent;
 
-public sealed class DigestService(
+public sealed partial class DigestService(
 	[FromKeyedServices("compaction")] IChatClient compactionClient,
 	IServiceScopeFactory                          scopeFactory,
 	IOptions<LisOptions>                          lisOptions,
@@ -140,7 +140,7 @@ public sealed class DigestService(
 
 		foreach (string line in response.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
 			// Try to match "msg <id>" pattern in the line
-			Match match = Regex.Match(line, @"msg\s+(\d+)");
+			Match match = DigestMsgIdRegex().Match(line);
 
 			if (match.Success && long.TryParse(match.Groups[1].Value, out long msgId) && toolMessageIds.Contains(msgId))
 				digests.Add((msgId, line));
@@ -188,4 +188,7 @@ public sealed class DigestService(
 		} catch { /* best effort */ }
 		return null;
 	}
+
+	[GeneratedRegex(@"msg\s+(\d+)", RegexOptions.NonBacktracking)]
+	private static partial Regex DigestMsgIdRegex();
 }

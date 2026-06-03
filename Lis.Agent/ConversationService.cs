@@ -24,7 +24,7 @@ using FunctionResultContent = Microsoft.SemanticKernel.FunctionResultContent;
 
 namespace Lis.Agent;
 
-public sealed class ConversationService(
+public sealed partial class ConversationService(
 	IServiceScopeFactory         scopeFactory,
 	IServiceProvider             serviceProvider,
 	IChannelClientProvider       channelProvider,
@@ -677,9 +677,9 @@ public sealed class ConversationService(
 	// ── Mention denormalization (outgoing) ──────────────────────────
 
 	private async Task<string> DenormalizeMentionsAsync(string body, string chatId, string senderId, CancellationToken ct) {
-		foreach (Match match in Regex.Matches(body, @"@(\w+)")) {
+		foreach (Match match in MentionNameRegex().Matches(body)) {
 			string name = match.Groups[1].Value;
-			if (Regex.IsMatch(name, @"^\d+$")) continue;
+			if (DigitsOnlyRegex().IsMatch(name)) continue;
 
 			string? phone = await this.ResolveNameToPhoneAsync(chatId, name, senderId, ct);
 			if (phone is not null)
@@ -742,4 +742,10 @@ public sealed class ConversationService(
 		int colon = user.IndexOf(':');
 		return colon > 0 ? user[..colon] : user;
 	}
+
+	[GeneratedRegex(@"@(\w+)", RegexOptions.NonBacktracking)]
+	private static partial Regex MentionNameRegex();
+
+	[GeneratedRegex(@"^\d+$", RegexOptions.NonBacktracking)]
+	private static partial Regex DigitsOnlyRegex();
 }

@@ -13,32 +13,32 @@ public sealed partial class WhatsAppFormatter : IMessageFormatter {
 
 	// ── Compiled Regexes ────────────────────────────────────────────
 
-	[GeneratedRegex(@"```[\s\S]*?```|`[^`\n]+`", RegexOptions.None)]
+	[GeneratedRegex(@"```[\s\S]*?```|`[^`\n]+`", RegexOptions.NonBacktracking)]
 	private static partial Regex CodeBlockRegex();
 
-	[GeneratedRegex(@"^#{1,6}\s+(.+)$",            RegexOptions.Multiline)]
+	[GeneratedRegex(@"^#{1,6}\s+(.+)$",            RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex HeaderRegex();
 
-	[GeneratedRegex(@"\*\*(.+?)\*\*",              RegexOptions.Singleline)]
+	[GeneratedRegex(@"\*\*(.+?)\*\*",              RegexOptions.Singleline | RegexOptions.NonBacktracking)]
 	private static partial Regex BoldRegex();
 
-	[GeneratedRegex(@"~~(.+?)~~",                   RegexOptions.Singleline)]
+	[GeneratedRegex(@"~~(.+?)~~",                   RegexOptions.Singleline | RegexOptions.NonBacktracking)]
 	private static partial Regex StrikethroughRegex();
 
-	[GeneratedRegex(@"^[\-\*]\s+",                  RegexOptions.Multiline)]
+	[GeneratedRegex(@"^[\-\*]\s+",                  RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex BulletRegex();
 
-	[GeneratedRegex(@"^[-\*_]{3,}\s*$",             RegexOptions.Multiline)]
+	[GeneratedRegex(@"^[-\*_]{3,}\s*$",             RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex HorizontalRuleRegex();
 
-	[GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)",     RegexOptions.None)]
+	[GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)",     RegexOptions.NonBacktracking)]
 	private static partial Regex LinkRegex();
 
-	[GeneratedRegex(@"\n{3,}",                      RegexOptions.None)]
+	[GeneratedRegex(@"\n{3,}",                      RegexOptions.NonBacktracking)]
 	private static partial Regex ExcessiveNewlinesRegex();
 
 	// Matches a full markdown table (header row, separator row, data rows)
-	[GeneratedRegex(@"(?:^\|.+\|[ \t]*\n)*^\|.+\|[ \t]*$", RegexOptions.Multiline)]
+	[GeneratedRegex(@"(?:^\|.+\|[ \t]*\n)*^\|.+\|[ \t]*$", RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex TableBlockRegex();
 
 	// ── Public API ──────────────────────────────────────────────────

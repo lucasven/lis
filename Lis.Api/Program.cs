@@ -244,5 +244,5 @@ static int EnvInt(string key, int fallback) {
 }
 
 static string RedactTelegramToken(Uri uri) {
-	return Regex.Replace(uri.ToString(), @"/bot[^/]+/", "/bot***/");
+	return Regex.Replace(uri.ToString(), @"/bot[^/]+/", "/bot***/", RegexOptions.None, TimeSpan.FromSeconds(1));
 }

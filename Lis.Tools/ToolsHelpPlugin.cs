@@ -11,6 +11,7 @@ public sealed class ToolsHelpPlugin {
 
 	private static readonly Dictionary<string, string> HelpContent = new(StringComparer.OrdinalIgnoreCase);
 
+	#pragma warning disable MA0045 // Static constructor — sync IO runs once at startup
 	static ToolsHelpPlugin() {
 		Assembly asm    = typeof(ToolsHelpPlugin).Assembly;
 		string   prefix = "Lis.Tools.Help.";
@@ -23,6 +24,7 @@ public sealed class ToolsHelpPlugin {
 			HelpContent[group] = reader.ReadToEnd();
 		}
 	}
+	#pragma warning restore MA0045
 
 	[KernelFunction("get")]
 	[Description("Get detailed documentation for a tool group: workflows, parameter details, examples, and common errors. Call without arguments to list available groups.")]

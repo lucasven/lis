@@ -14,7 +14,7 @@ namespace Lis.Channels.WhatsApp;
 [ApiController]
 [Route("webhook/whatsapp")]
 [Tags("WhatsApp")]
-public class GowaWebhookController(
+public partial class GowaWebhookController(
 	WebhookValidator               validator,
 	GowaClient                     gowaClient,
 	IConversationService           conversationService,
@@ -170,7 +170,7 @@ public class GowaWebhookController(
 	private async Task<string> NormalizeMentionsAsync(string body, string chatId) {
 		string botPhone = _botJid is { Length: > 0 } ? ExtractPhone(_botJid) : "";
 
-		foreach (Match match in Regex.Matches(body, @"@(\d+)")) {
+		foreach (Match match in MentionRegex().Matches(body)) {
 			string phone = match.Groups[1].Value;
 
 			// Bot's own phone → display name
@@ -219,4 +219,7 @@ public class GowaWebhookController(
 		await request.Body.CopyToAsync(ms);
 		return ms.ToArray();
 	}
+
+	[GeneratedRegex(@"@(\d+)", RegexOptions.NonBacktracking)]
+	private static partial Regex MentionRegex();
 }

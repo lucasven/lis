@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
 
 using Lis.Core.Util;
@@ -40,7 +39,7 @@ public sealed class ExecPlugin(IServiceScopeFactory scopeFactory) {
 			WorkingDirectory       = workingDirectory,
 		};
 
-		if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+		if (OperatingSystem.IsWindows()) {
 			psi.FileName  = "cmd";
 		} else if (HostExec) {
 			psi.FileName         = "nsenter";

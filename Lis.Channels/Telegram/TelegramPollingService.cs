@@ -77,7 +77,7 @@ public sealed class TelegramPollingService(
 			ChatId         = msg.Chat.Id.ToString(),
 			SenderId       = msg.From?.Id.ToString() ?? "",
 			SenderName     = BuildSenderName(msg.From),
-			Timestamp      = msg.Date,
+			Timestamp      = new DateTimeOffset(msg.Date, TimeSpan.Zero),
 			IsFromMe       = false,
 			IsGroup        = isGroup,
 			Body           = msg.Text ?? msg.Caption,

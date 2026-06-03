@@ -334,7 +334,9 @@ public sealed class MessageDebouncer(
 	}
 
 	private static void ResetDebounceTimer(ChatState state) {
+#pragma warning disable MA0045 // Sync Cancel — intentionally non-async reset in lock-protected path
 		state.DebounceCts?.Cancel();
+#pragma warning restore MA0045
 		state.DebounceCts?.Dispose();
 		state.DebounceCts = new CancellationTokenSource();
 	}

@@ -47,6 +47,7 @@ public static class CodexProvider {
 		return services;
 	}
 
+	#pragma warning disable MA0045 // Sync IO — called during service registration, before async pipeline
 	private static (string? Access, string? Refresh) LoadPersistedTokens() {
 		try {
 			string path = Path.Combine(AppContext.BaseDirectory, "auth.json");
@@ -66,6 +67,7 @@ public static class CodexProvider {
 			return (null, null);
 		}
 	}
+	#pragma warning restore MA0045
 
 	private static string Env(string key) => Environment.GetEnvironmentVariable(key) ?? "";
 

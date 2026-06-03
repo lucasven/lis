@@ -24,34 +24,37 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 	private const string PH_STRIKE_CLOSE = "\u0002SC\u0002";
 	private const string PH_QUOTE        = "\u0002BQ\u0002";
 
-	[GeneratedRegex(@"```([\s\S]*?)```", RegexOptions.None)]
+	[GeneratedRegex(@"```([\s\S]*?)```", RegexOptions.NonBacktracking)]
 	private static partial Regex FencedCodeRegex();
 
-	[GeneratedRegex(@"`([^`\n]+)`", RegexOptions.None)]
+	[GeneratedRegex(@"`([^`\n]+)`", RegexOptions.NonBacktracking)]
 	private static partial Regex InlineCodeRegex();
 
-	[GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)", RegexOptions.None)]
+	[GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)", RegexOptions.NonBacktracking)]
 	private static partial Regex LinkRegex();
 
-	[GeneratedRegex(@"\*\*\*(.+?)\*\*\*", RegexOptions.Singleline)]
+	[GeneratedRegex(@"\*\*\*(.+?)\*\*\*", RegexOptions.Singleline | RegexOptions.NonBacktracking)]
 	private static partial Regex BoldItalicRegex();
 
-	[GeneratedRegex(@"\*\*(.+?)\*\*", RegexOptions.Singleline)]
+	[GeneratedRegex(@"\*\*(.+?)\*\*", RegexOptions.Singleline | RegexOptions.NonBacktracking)]
 	private static partial Regex BoldRegex();
 
+	// Lookaround not compatible with NonBacktracking — pattern is bounded by message length
+#pragma warning disable MA0009
 	[GeneratedRegex(@"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", RegexOptions.Singleline)]
 	private static partial Regex ItalicRegex();
+#pragma warning restore MA0009
 
-	[GeneratedRegex(@"~~(.+?)~~", RegexOptions.Singleline)]
+	[GeneratedRegex(@"~~(.+?)~~", RegexOptions.Singleline | RegexOptions.NonBacktracking)]
 	private static partial Regex StrikethroughRegex();
 
-	[GeneratedRegex(@"^---+\s*$", RegexOptions.Multiline)]
+	[GeneratedRegex(@"^---+\s*$", RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex HorizontalRuleRegex();
 
-	[GeneratedRegex(@"((?:^\|.+\|[ \t]*\n?)+)", RegexOptions.Multiline)]
+	[GeneratedRegex(@"((?:^\|.+\|[ \t]*\n?)+)", RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex TableRegex();
 
-	[GeneratedRegex(@"^>\s?(.*)$", RegexOptions.Multiline)]
+	[GeneratedRegex(@"^>\s?(.*)$", RegexOptions.Multiline | RegexOptions.NonBacktracking)]
 	private static partial Regex BlockquoteRegex();
 
 	public string Format(string content) {
@@ -149,7 +152,7 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 		foreach (string line in lines) {
 			string trimmed = line.Trim();
 			// Separator row: each cell contains only dashes/colons (at least 3 dashes)
-			if (Regex.IsMatch(trimmed, @"^\|(\s*:?-{3,}:?\s*\|)+\s*$")) continue;
+			if (SeparatorRowRegex().IsMatch(trimmed)) continue;
 			string[] cells = trimmed.Split('|', StringSplitOptions.None)
 				.Where((_, i) => i > 0) // skip empty before first |
 				.ToArray();
@@ -183,6 +186,9 @@ public sealed partial class TelegramFormatter : IMessageFormatter {
 
 		return sb.ToString().TrimEnd('\n');
 	}
+
+	[GeneratedRegex(@"^\|(\s*:?-{3,}:?\s*\|)+\s*$", RegexOptions.NonBacktracking)]
+	private static partial Regex SeparatorRowRegex();
 
 	private static string StripInlineCode(string text) {
 		return InlineCodeRegex().Replace(text, m => m.Groups[1].Value);

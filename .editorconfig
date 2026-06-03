@@ -311,6 +311,169 @@ dotnet_diagnostic.CA1727.severity = suggestion      # Use PascalCase for log pla
 dotnet_diagnostic.CA1861.severity = none            # Avoid constant arrays (migrations)
 dotnet_diagnostic.CA2201.severity = suggestion      # Do not raise reserved exception types
 
+# Meziantou.Analyzer (MA) rules
+# Full overlap with existing CA/IDE rules — disable
+dotnet_diagnostic.MA0001.severity = none            # StringComparison missing (CA1307/CA1310)
+dotnet_diagnostic.MA0005.severity = none            # Use Array.Empty<T>() (CA1825)
+dotnet_diagnostic.MA0010.severity = none            # Use AttributeUsageAttribute (CA1018)
+dotnet_diagnostic.MA0011.severity = none            # IFormatProvider missing (CA1304/CA1305)
+dotnet_diagnostic.MA0012.severity = none            # Reserved exception type (CA2201)
+dotnet_diagnostic.MA0015.severity = none            # Parameter name in ArgumentException (CA2208)
+dotnet_diagnostic.MA0017.severity = none            # Abstract type public constructors (CA1012)
+dotnet_diagnostic.MA0018.severity = none            # Static members on generic types (CA1000)
+dotnet_diagnostic.MA0036.severity = none            # Make class static (CA1052)
+dotnet_diagnostic.MA0037.severity = none            # Remove empty statement (IDE0035)
+dotnet_diagnostic.MA0038.severity = none            # Make method static (CA1822)
+dotnet_diagnostic.MA0041.severity = none            # Make property static (CA1822)
+dotnet_diagnostic.MA0044.severity = none            # Useless ToString call (IDE0071)
+dotnet_diagnostic.MA0046.severity = none            # Use EventHandler<T> (CA1003)
+dotnet_diagnostic.MA0047.severity = none            # Declare types in namespaces (IDE0161)
+dotnet_diagnostic.MA0056.severity = none            # Overridable members in constructor (CA2214)
+dotnet_diagnostic.MA0064.severity = none            # Locking on public instance (CA2002)
+dotnet_diagnostic.MA0069.severity = none            # Non-constant static fields visible (CA2211)
+dotnet_diagnostic.MA0071.severity = none            # Redundant else (IDE0046)
+dotnet_diagnostic.MA0073.severity = none            # Comparison with bool constant (IDE0100)
+dotnet_diagnostic.MA0102.severity = none            # Make member readonly (IDE0044)
+dotnet_diagnostic.MA0134.severity = none            # Observe async result (CS4014)
+dotnet_diagnostic.MA0141.severity = none            # Use 'is not null' (IDE0041)
+dotnet_diagnostic.MA0142.severity = none            # Use 'is null' (IDE0041)
+
+# Conflicts with project style — disable
+dotnet_diagnostic.MA0004.severity = none            # ConfigureAwait (not needed in ASP.NET Core)
+dotnet_diagnostic.MA0007.severity = none            # Trailing comma (conflicts with ReSharper)
+dotnet_diagnostic.MA0048.severity = none            # File name must match type name (interface+impl in same file)
+dotnet_diagnostic.MA0051.severity = none            # Method too long (noisy with orchestration)
+dotnet_diagnostic.MA0057.severity = none            # Class name should end with 'Attribute' (CA1710 disabled)
+dotnet_diagnostic.MA0058.severity = none            # Class name should end with 'Exception' (CA1710 disabled)
+dotnet_diagnostic.MA0059.severity = none            # Class name should end with 'EventArgs' (CA1710 disabled)
+
+# Blazor rules — not applicable
+dotnet_diagnostic.MA0115.severity = none            # Unknown component parameter
+dotnet_diagnostic.MA0116.severity = none            # SupplyParameterFromQuery needs [Parameter]
+dotnet_diagnostic.MA0117.severity = none            # EditorRequired needs [Parameter]
+dotnet_diagnostic.MA0118.severity = none            # JSInvokable must be public
+dotnet_diagnostic.MA0119.severity = none            # JSRuntime in OnInitialized
+dotnet_diagnostic.MA0120.severity = none            # Use InvokeVoidAsync
+dotnet_diagnostic.MA0122.severity = none            # SupplyParameterFromQuery in routable components
+dotnet_diagnostic.MA0123.severity = none            # Sequence number must be constant
+dotnet_diagnostic.MA0187.severity = none            # Use constructor injection over [Inject]
+
+# Regex — suggestion (nice-to-have, not critical)
+dotnet_diagnostic.MA0023.severity = suggestion      # Add RegexOptions.ExplicitCapture
+
+# Security — warning
+dotnet_diagnostic.MA0009.severity = warning         # Add regex evaluation timeout (ReDoS)
+dotnet_diagnostic.MA0035.severity = warning         # Dangerous threading methods (Thread.Abort)
+dotnet_diagnostic.MA0039.severity = warning         # Custom certificate validation
+dotnet_diagnostic.MA0153.severity = warning         # Logging data with [DataClassification]
+dotnet_diagnostic.MA0161.severity = warning         # UseShellExecute must be explicit
+dotnet_diagnostic.MA0163.severity = warning         # UseShellExecute false when redirecting
+
+# Async/threading — warning (biggest gap in current setup)
+dotnet_diagnostic.MA0042.severity = warning         # .Result in async method (deadlock)
+dotnet_diagnostic.MA0045.severity = warning         # .Wait()/.GetAwaiter().GetResult() in async (deadlock)
+dotnet_diagnostic.MA0079.severity = warning         # IAsyncEnumerable without .WithCancellation()
+dotnet_diagnostic.MA0080.severity = warning         # CancellationToken via .WithCancellation()
+dotnet_diagnostic.MA0100.severity = warning         # Await task before disposing
+dotnet_diagnostic.MA0129.severity = warning         # Await task in using statement
+dotnet_diagnostic.MA0147.severity = warning         # Async void delegate
+dotnet_diagnostic.MA0152.severity = suggestion      # Use Unwrap instead of double await
+dotnet_diagnostic.MA0155.severity = warning         # Async void methods
+dotnet_diagnostic.MA0158.severity = suggestion      # Use System.Threading.Lock
+
+# Correctness/bug prevention — warning
+dotnet_diagnostic.MA0022.severity = warning         # Return Task.FromResult not null
+dotnet_diagnostic.MA0027.severity = warning         # throw vs throw ex (stack trace)
+dotnet_diagnostic.MA0033.severity = warning         # Instance field with [ThreadStatic]
+dotnet_diagnostic.MA0050.severity = warning         # Validate args in iterator methods
+dotnet_diagnostic.MA0054.severity = warning         # Embed caught exception as innerException
+dotnet_diagnostic.MA0060.severity = warning         # Stream.Read return value not used
+dotnet_diagnostic.MA0061.severity = warning         # Override changes default parameter value
+dotnet_diagnostic.MA0062.severity = warning         # Non-flags enum marked [Flags]
+dotnet_diagnostic.MA0072.severity = warning         # Throw from finally block
+dotnet_diagnostic.MA0081.severity = warning         # Override omits params keyword
+dotnet_diagnostic.MA0082.severity = warning         # NaN in comparisons (always false)
+dotnet_diagnostic.MA0084.severity = warning         # Local variable shadows another symbol
+dotnet_diagnostic.MA0085.severity = warning         # Anonymous delegate to unsubscribe event
+dotnet_diagnostic.MA0086.severity = warning         # Throw from finalizer
+dotnet_diagnostic.MA0091.severity = warning         # Event sender should be 'this'
+dotnet_diagnostic.MA0092.severity = warning         # Event sender should be null for static
+dotnet_diagnostic.MA0093.severity = warning         # EventArgs should not be null
+dotnet_diagnostic.MA0095.severity = warning         # IEquatable<T> must override Equals(object)
+dotnet_diagnostic.MA0096.severity = warning         # IComparable<T> should implement IEquatable<T>
+dotnet_diagnostic.MA0097.severity = warning         # IComparable<T> should override comparison operators
+dotnet_diagnostic.MA0121.severity = suggestion      # Do not overwrite parameter value
+dotnet_diagnostic.MA0131.severity = warning         # ThrowIfNull on non-nullable type
+dotnet_diagnostic.MA0132.severity = warning         # Implicit DateTime to DateTimeOffset conversion
+dotnet_diagnostic.MA0133.severity = warning         # Use DateTimeOffset explicitly
+dotnet_diagnostic.MA0140.severity = warning         # Both if/else branches identical
+dotnet_diagnostic.MA0143.severity = warning         # Primary constructor params should be readonly
+dotnet_diagnostic.MA0172.severity = warning         # Both sides of logical op identical
+dotnet_diagnostic.MA0195.severity = warning         # Static field used before initialized
+dotnet_diagnostic.MA0201.severity = warning         # Zero-valued flag in HasFlag check
+dotnet_diagnostic.MA0202.severity = warning         # Conditional compilation branches identical
+
+# Culture/globalization — suggestion
+dotnet_diagnostic.MA0002.severity = suggestion      # Missing IEqualityComparer<string>
+dotnet_diagnostic.MA0006.severity = suggestion      # Use String.Equals not == for strings
+dotnet_diagnostic.MA0021.severity = suggestion      # Use StringComparer.GetHashCode
+dotnet_diagnostic.MA0024.severity = suggestion      # Explicit StringComparer in LINQ
+dotnet_diagnostic.MA0074.severity = suggestion      # Implicit culture-sensitive methods
+dotnet_diagnostic.MA0075.severity = suggestion      # Implicit culture-sensitive ToString
+dotnet_diagnostic.MA0076.severity = suggestion      # Culture-sensitive ToString in interpolation
+dotnet_diagnostic.MA0127.severity = suggestion      # String.Equals instead of is pattern
+dotnet_diagnostic.MA0193.severity = suggestion      # Use MidpointRounding argument
+
+# Performance — suggestion
+dotnet_diagnostic.MA0020.severity = suggestion      # Direct methods instead of LINQ
+dotnet_diagnostic.MA0028.severity = suggestion      # Optimize StringBuilder
+dotnet_diagnostic.MA0029.severity = suggestion      # Combine LINQ methods
+dotnet_diagnostic.MA0030.severity = warning         # Useless OrderBy call (likely a bug)
+dotnet_diagnostic.MA0031.severity = suggestion      # Optimize Count() usage
+dotnet_diagnostic.MA0063.severity = suggestion      # Where before OrderBy
+dotnet_diagnostic.MA0078.severity = suggestion      # Use Cast instead of Select to cast
+dotnet_diagnostic.MA0089.severity = suggestion      # Optimize string method usage
+dotnet_diagnostic.MA0098.severity = suggestion      # Use indexer instead of LINQ
+dotnet_diagnostic.MA0105.severity = suggestion      # Avoid closure, use lambda params
+dotnet_diagnostic.MA0106.severity = suggestion      # Avoid closure via factory overload
+dotnet_diagnostic.MA0112.severity = suggestion      # Count > 0 instead of Any()
+dotnet_diagnostic.MA0159.severity = suggestion      # Use Order() instead of OrderBy(x => x)
+dotnet_diagnostic.MA0160.severity = suggestion      # ContainsKey instead of TryGetValue
+dotnet_diagnostic.MA0176.severity = suggestion      # Optimize Guid creation
+dotnet_diagnostic.MA0178.severity = suggestion      # TimeSpan.Zero instead of FromXXX(0)
+
+# Design — suggestion
+dotnet_diagnostic.MA0003.severity = none            # Add parameter name (too noisy)
+dotnet_diagnostic.MA0008.severity = suggestion      # Add StructLayoutAttribute
+dotnet_diagnostic.MA0013.severity = warning         # Do not extend ApplicationException
+dotnet_diagnostic.MA0014.severity = warning         # Do not raise ApplicationException
+dotnet_diagnostic.MA0016.severity = suggestion      # Prefer collection abstraction
+dotnet_diagnostic.MA0019.severity = suggestion      # Use EventArgs.Empty
+dotnet_diagnostic.MA0025.severity = suggestion      # NotImplementedException in code
+dotnet_diagnostic.MA0026.severity = suggestion      # Fix TODO comment
+dotnet_diagnostic.MA0053.severity = none            # Make class sealed (too aggressive)
+dotnet_diagnostic.MA0055.severity = warning         # Do not use finalizer
+dotnet_diagnostic.MA0065.severity = warning         # Default struct Equals/HashCode
+dotnet_diagnostic.MA0066.severity = warning         # Hash-unfriendly type as key
+dotnet_diagnostic.MA0070.severity = suggestion      # Obsolete should include explanation
+dotnet_diagnostic.MA0077.severity = suggestion      # Equals(T) should implement IEquatable<T>
+dotnet_diagnostic.MA0094.severity = suggestion      # CompareTo(T) should implement IComparable<T>
+dotnet_diagnostic.MA0099.severity = suggestion      # Use explicit enum value instead of 0
+dotnet_diagnostic.MA0103.severity = suggestion      # Use SequenceEqual not ==
+dotnet_diagnostic.MA0104.severity = suggestion      # Type name clashes with BCL
+dotnet_diagnostic.MA0109.severity = none            # Consider Span<T>/Memory<T> overload (too noisy)
+dotnet_diagnostic.MA0137.severity = none            # Async suffix (noisy with SK patterns)
+dotnet_diagnostic.MA0138.severity = none            # Non-async without Async suffix
+dotnet_diagnostic.MA0168.severity = suggestion      # Readonly struct for in/ref readonly
+
+# Logging — suggestion
+dotnet_diagnostic.MA0124.severity = suggestion      # Invalid log parameter type
+dotnet_diagnostic.MA0125.severity = suggestion      # Invalid type in log parameter list
+dotnet_diagnostic.MA0126.severity = warning         # Duplicate log parameter type
+dotnet_diagnostic.MA0135.severity = suggestion      # Log parameter has no configured type
+dotnet_diagnostic.MA0180.severity = suggestion      # ILogger<T> type should match containing type
+dotnet_diagnostic.MA0183.severity = suggestion      # Format string should use placeholders
+
 # xUnit rules
 dotnet_diagnostic.xUnit1004.severity = suggestion   # Test methods should not be skipped
 
@@ -321,13 +484,19 @@ dotnet_diagnostic.CA1707.severity = none            # Underscores in identifiers
 dotnet_diagnostic.IDE0055.severity = none           # Formatting (generated code)
 dotnet_diagnostic.IDE0005.severity = none           # Unnecessary usings
 
-# Program.cs (top-level statements - some sync calls are intentional)
+# Program.cs and startup utilities (sync calls are intentional at boot)
 [**/Program.cs]
 dotnet_diagnostic.CA1849.severity = none            # Sync methods in top-level statements are OK
+dotnet_diagnostic.MA0042.severity = none            # Blocking calls OK in startup
+dotnet_diagnostic.MA0045.severity = none            # Sync IO OK in startup
 
-# Test files (underscore naming convention is standard for test methods)
-[Tests/**/*.cs]
+[**/DotEnv.cs]
+dotnet_diagnostic.MA0045.severity = none            # Sync IO — runs once at boot before async pipeline
+
+# Test files
+[{Tests,*Tests,*.Tests}/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none            # Underscores in test method names
+dotnet_diagnostic.MA0045.severity = none            # Sync calls OK in test setup/helpers
 
 # JSON files
 [*.json]

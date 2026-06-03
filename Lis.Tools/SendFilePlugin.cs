@@ -24,8 +24,8 @@ public sealed class SendFilePlugin(IServiceScopeFactory scopeFactory) {
 		if (ToolContext.Channel is null || ToolContext.ChatId is null)
 			return "Error: no channel context available.";
 
-		string resolved = this.ResolveSafePath(path);
-		string relativePath = Path.GetRelativePath(this.ResolveWorkspacePath(), resolved);
+		string resolved = await this.ResolveSafePathAsync(path);
+		string relativePath = Path.GetRelativePath(await this.ResolveWorkspacePathAsync(), resolved);
 		await ToolContext.NotifyAsync($"📎 Sending file\n{relativePath}");
 
 		if (!File.Exists(resolved))
@@ -53,17 +53,17 @@ public sealed class SendFilePlugin(IServiceScopeFactory scopeFactory) {
 		return "application/octet-stream";
 	}
 
-	private string ResolveWorkspacePath() {
+	private async Task<string> ResolveWorkspacePathAsync() {
 		long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 		using IServiceScope scope = scopeFactory.CreateScope();
 		LisDbContext db = scope.ServiceProvider.GetRequiredService<LisDbContext>();
 
-		AgentEntity? agent = db.Agents.Find(agentId);
+		AgentEntity? agent = await db.Agents.FindAsync(agentId);
 		return agent?.WorkspacePath ?? Directory.GetCurrentDirectory();
 	}
 
-	private string ResolveSafePath(string userPath) {
-		string workspace = this.ResolveWorkspacePath();
+	private async Task<string> ResolveSafePathAsync(string userPath) {
+		string workspace = await this.ResolveWorkspacePathAsync();
 		string resolved = Path.GetFullPath(userPath, workspace);
 		if (!resolved.StartsWith(workspace, StringComparison.OrdinalIgnoreCase))
 			throw new UnauthorizedAccessException($"Path outside workspace: {userPath}");

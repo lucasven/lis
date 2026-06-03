@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Lis.Agent.Commands;
 
-public sealed class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppressionService errorSuppression) : IChatCommand {
+public sealed partial class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppressionService errorSuppression) : IChatCommand {
 	// Kept for DI consistency; may be used for cross-agent model queries later.
 	private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
 
@@ -45,10 +45,16 @@ public sealed class ModelCommand(IServiceScopeFactory scopeFactory, ErrorSuppres
 	}
 
 	internal static string? DetectProvider(string model) {
-		if (Regex.IsMatch(model, @"^(claude-)", RegexOptions.IgnoreCase))
+		if (AnthropicModelRegex().IsMatch(model))
 			return "anthropic";
-		if (Regex.IsMatch(model, @"^(gpt-|codex-|o[13]-|o[13]p-|chatgpt-)", RegexOptions.IgnoreCase))
+		if (OpenAiModelRegex().IsMatch(model))
 			return "codex";
 		return null;
 	}
+
+	[GeneratedRegex(@"^(claude-)", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking)]
+	private static partial Regex AnthropicModelRegex();
+
+	[GeneratedRegex(@"^(gpt-|codex-|o[13]-|o[13]p-|chatgpt-)", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking)]
+	private static partial Regex OpenAiModelRegex();
 }

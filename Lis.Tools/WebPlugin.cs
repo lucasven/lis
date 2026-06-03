@@ -111,9 +111,9 @@ public sealed partial class WebPlugin(IHttpClientFactory httpClientFactory, ILog
 		}
 	}
 
-	[GeneratedRegex("<[^>]+>")]
+	[GeneratedRegex("<[^>]+>", RegexOptions.NonBacktracking)]
 	private static partial Regex StripHtmlTags();
 
-	[GeneratedRegex(@"\s+")]
+	[GeneratedRegex(@"\s+", RegexOptions.NonBacktracking)]
 	private static partial Regex CollapseWhitespace();
 }
