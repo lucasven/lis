@@ -23,9 +23,6 @@ namespace Lis.Agent;
 public sealed class A2aClient(
 	IServiceScopeFactory scopeFactory,
 	IServiceProvider     serviceProvider,
-	Kernel               kernel,
-	ToolRunner           toolRunner,
-	ToolPolicyService    toolPolicyService,
 	PromptComposer       promptComposer,
 	ILogger<A2aClient>   logger) : IA2aClient {
 
@@ -90,6 +87,11 @@ public sealed class A2aClient(
 						_        => int.TryParse(effort, out int t) ? t : 4096
 					}
 				};
+
+			// Resolve lazily to break circular dependency (Kernel → A2aPlugin → A2aClient → Kernel)
+			Kernel            kernel            = serviceProvider.GetRequiredService<Kernel>();
+			ToolRunner        toolRunner        = serviceProvider.GetRequiredService<ToolRunner>();
+			ToolPolicyService toolPolicyService = serviceProvider.GetRequiredService<ToolPolicyService>();
 
 			// Clone kernel and filter plugins based on target agent's tool policy
 			Kernel agentKernel = kernel.Clone();
