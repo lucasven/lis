@@ -107,11 +107,21 @@ public sealed class A2aClient(
 			};
 
 			// ToolContext isolation for the target agent
+			// Use the receiver's primary chat so tools (e.g. cron) bind to the correct agent context
+			ChatEntity? agentChat = await db.Chats
+				.Where(c => c.AgentId == agent.Id && c.Enabled && c.Channel != null)
+				.OrderByDescending(c => c.UpdatedAt)
+				.FirstOrDefaultAsync(ct);
+
 			ToolContext.Channel              = null;
+			ToolContext.ChannelName          = agentChat?.Channel ?? "a2a";
+			ToolContext.ChatId               = agentChat?.ExternalId ?? fakeMsg.ChatId;
 			ToolContext.NotificationsEnabled = false;
 			ToolContext.MessageExternalId    = null;
 			ToolContext.CacheBreakIndex      = -1;
 			ToolContext.AgentId              = agent.Id;
+			ToolContext.SenderJid            = "a2a";
+			ToolContext.IsOwner              = true;
 			ToolContext.Depth                = currentDepth + 1;
 
 			tracer?.StartLlmSpan(modelSettings.Model, agent.Provider, history);
