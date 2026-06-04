@@ -60,10 +60,11 @@ public sealed class SubagentPluginParallelTests : IDisposable {
 
 		await plugin.SpawnParallelAsync(["task A", "task B"]);
 
-		// 1 initial "Spawning..." notification + 2 result notifications
-		Assert.Equal(3, channel.MessagesSent);
-		Assert.Contains(channel.Messages, m => m.Contains("Subagent 1/2"));
-		Assert.Contains(channel.Messages, m => m.Contains("Subagent 2/2"));
+		// 2 task notifications + 2 result notifications
+		Assert.Equal(4, channel.MessagesSent);
+		Assert.Contains(channel.Messages, m => m.Contains("Subagent 1/2 task:"));
+		Assert.Contains(channel.Messages, m => m.Contains("Subagent 2/2 task:"));
+		Assert.Contains(channel.Messages, m => m.Contains('✅'));
 	}
 
 	// -- parallel: one failure doesn't crash others ----------------------------

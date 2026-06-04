@@ -72,7 +72,9 @@ public sealed class SubagentPlugin(ISubagentRunner runner) {
 		string?         chatId  = ToolContext.ChatId;
 		int             total   = tasks.Count;
 
-		await ToolContext.NotifyAsync($"🧠 *Spawning {total} parallel subagents...*", ct);
+		// Send each task description to the chat before spawning
+		for (int i = 0; i < total; i++)
+			await ToolContext.NotifyAsync($"🧠 *Subagent {i + 1}/{total} task:*\n{tasks[i]}", ct);
 
 		SubagentResult[] results = await Task.WhenAll(tasks.Select(async (task, index) => {
 			SubagentResult result = await runner.RunAsync(new SubagentRequest { Task = task, Model = model }, agentId, ct);
