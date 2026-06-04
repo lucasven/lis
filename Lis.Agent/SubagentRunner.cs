@@ -12,6 +12,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 
+using FunctionCallContent = Microsoft.SemanticKernel.FunctionCallContent;
+using FunctionResultContent = Microsoft.SemanticKernel.FunctionResultContent;
+
 namespace Lis.Agent;
 
 public sealed class SubagentRunner(
@@ -41,7 +44,8 @@ public sealed class SubagentRunner(
 		} catch (OperationCanceledException) {
 			throw;
 		} catch (Exception ex) {
-			logger.LogError(ex, "Subagent execution failed for agent {AgentId}", agentId);
+			logger.LogError(ex, "Subagent execution failed for agent {AgentId}, task: {Task}, model: {Model}, depth: {Depth}",
+					agentId, request.Task?[..Math.Min(request.Task.Length, 200)], request.Model ?? "(default)", currentDepth);
 			return new SubagentResult { Status = SubagentStatus.Failed, Error = ex.Message };
 		}
 	}
@@ -52,6 +56,7 @@ public sealed class SubagentRunner(
 
 		using IServiceScope scope = scopeFactory.CreateScope();
 		LisDbContext db            = scope.ServiceProvider.GetRequiredService<LisDbContext>();
+		OpikTracer? tracer         = scope.ServiceProvider.GetService<OpikTracer>();
 
 		AgentEntity agent = await db.Agents.AsNoTracking().FirstAsync(a => a.Id == agentId, ct);
 
@@ -107,19 +112,62 @@ public sealed class SubagentRunner(
 		ToolContext.CacheBreakIndex      = -1;
 		ToolContext.Depth                = parentDepth + 1;
 
-		string? lastAssistantContent = null;
-		int totalInput               = 0;
-		int totalOutput              = 0;
+		IncomingMessage fakeMsg = new() {
+			ExternalId = Guid.NewGuid().ToString(),
+			ChatId     = ToolContext.ChatId ?? $"sub:{agentId}",
+			SenderId   = "subagent",
+			Body       = request.Task,
+			SenderName = "subagent",
+			Channel    = "subagent",
+		};
+		tracer?.StartTrace(fakeMsg.ChatId, agent.Name, provider, modelId, agentId, fakeMsg);
+		tracer?.StartLlmSpan(modelId, provider, history);
 
-		await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, history, agentKernel, settings, usageExtractor, ct)) {
-			if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content))
-				lastAssistantContent = msg.Content;
+		string?     lastAssistantContent = null;
+		TokenUsage? lastUsage            = null;
+		int         totalInput           = 0;
+		int         totalOutput          = 0;
 
-			TokenUsage? usage = ToolRunner.GetUsage(msg);
-			if (usage is not null) {
-				totalInput  += usage.TotalInputTokens;
-				totalOutput += usage.OutputTokens;
+		try {
+			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, history, agentKernel, settings, usageExtractor, ct)) {
+				TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
+
+				if (msg.Role == AuthorRole.Assistant) {
+					if (!string.IsNullOrWhiteSpace(msg.Content))
+						lastAssistantContent = msg.Content;
+
+					if (msgUsage is not null) {
+						lastUsage = msgUsage;
+						tracer?.EndLlmSpan(msg, msgUsage);
+					} else {
+						tracer?.StartLlmSpan(modelId, provider, history);
+					}
+				}
+
+				if (msg.Role == AuthorRole.Tool) {
+					foreach (KernelContent item in msg.Items) {
+						if (item is FunctionResultContent fr) {
+							FunctionCallContent? matchingCall = null;
+							foreach (ChatMessageContent prev in history.AsEnumerable().Reverse()) {
+								matchingCall = prev.Items.OfType<FunctionCallContent>()
+									.FirstOrDefault(c => c.Id == fr.CallId);
+								if (matchingCall is not null) break;
+							}
+							if (matchingCall is not null) tracer?.RecordToolSpan(matchingCall, fr);
+						}
+					}
+				}
+
+				if (msgUsage is not null) {
+					totalInput  += msgUsage.TotalInputTokens;
+					totalOutput += msgUsage.OutputTokens;
+				}
 			}
+
+			if (tracer is not null) await tracer.EndTraceAsync(lastAssistantContent ?? "(no response)", lastUsage);
+		} catch (Exception ex) when (ex is not OperationCanceledException) {
+			if (tracer is not null) await tracer.EndTraceAsync(null, lastUsage, ex);
+			throw;
 		}
 
 		return new SubagentResult {

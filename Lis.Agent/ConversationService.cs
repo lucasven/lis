@@ -347,7 +347,8 @@ public sealed partial class ConversationService(
 		} catch (Exception ex) when (ex is not OperationCanceledException) {
 			string? errorMsg = this.ClassifyAiError(ex, agent, agentModelSettings);
 			if (errorMsg is not null) {
-				logger.LogError(ex, "AI provider error in {ChatId}: {UserMessage}", message.ChatId, errorMsg);
+				logger.LogError(ex, "AI provider error in {ChatId}. Model: {Model}, provider: {Provider}, history size: {HistoryCount}. {UserMessage}",
+					message.ChatId, agentModelSettings.Model, agent.Provider, chatHistory.Count, errorMsg);
 				await channel.StopTypingAsync(message.ChatId, ct);
 				string errorKey = errorMsg.GetHashCode().ToString();
 				if (errorSuppression.ShouldNotify(agent.Id, errorKey)) {

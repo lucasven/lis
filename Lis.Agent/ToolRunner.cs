@@ -48,7 +48,8 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 			}
 		}
 
-		logger.LogWarning("Max tool iterations ({Max}) reached", MaxIterations);
+		logger.LogWarning("Max tool iterations ({Max}) reached. Chat: {ChatId}, depth: {Depth}, messages in history: {MessageCount}",
+			MaxIterations, ToolContext.ChatId ?? "unknown", ToolContext.Depth, history.Count);
 	}
 
 	/// <summary>
@@ -162,7 +163,13 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 				logger.LogWarning(ex, "Tried to execute tool '{Tool}' but it does not exist", call.FunctionName);
 			else if (ex is ArgumentException or ArgumentNullException
 			         || ex.InnerException is ArgumentException or ArgumentNullException)
-				logger.LogWarning(ex, "Tried to execute tool '{Tool}' without the needed arguments", call.FunctionName);
+				logger.LogWarning(ex, "Tried to execute tool '{Plugin}.{Tool}' without the needed arguments. Provided: {Arguments}",
+					call.PluginName, call.FunctionName,
+					call.Arguments is not null ? System.Text.Json.JsonSerializer.Serialize(call.Arguments) : "(null)");
+			else if (ex.InnerException is System.Text.Json.JsonException)
+				logger.LogWarning(ex, "Model produced invalid JSON arguments for tool '{Plugin}.{Tool}'. Arguments: {Arguments}",
+					call.PluginName, call.FunctionName,
+					call.Arguments is not null ? System.Text.Json.JsonSerializer.Serialize(call.Arguments) : "(null)");
 			else
 				logger.LogError(ex, "Error executing tool '{Tool}'", call.FunctionName);
 

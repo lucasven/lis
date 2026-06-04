@@ -296,9 +296,19 @@ public sealed class CompactionService(
 			""";
 
 		string model = lisOptions.Value.CompactionModel is { Length: > 0 } m ? m : agentModel;
+
+		if (logger.IsEnabled(LogLevel.Information))
+			logger.LogInformation("Starting summarization. Model: {Model}, conversation size: {ConversationChars} chars",
+				model, conversationText.Length);
+
 		ChatOptions options = new() { ModelId = model };
 		ChatResponse result = await compactionClient.GetResponseAsync(prompt, options, ct);
 		int outputTokens = (int)(result.Usage?.OutputTokenCount ?? 0);
+
+		if (logger.IsEnabled(LogLevel.Information))
+			logger.LogInformation("Summarization completed. Model: {Model}, summary: {SummaryChars} chars, output tokens: {OutputTokens}",
+				model, result.Text?.Length ?? 0, outputTokens);
+
 		return (result.Text ?? "", outputTokens);
 	}
 
