@@ -31,13 +31,16 @@ Lis takes the opposite approach. It goes deep on the things that make an AI assi
 | **Message debounce UX** | 🕐 reaction on queued messages, typing resets timer | Silent internal queue, no user feedback |
 | **Response directives** | `[QUOTE]`, `NO_RESPONSE`, react by message ID | No equivalent |
 | **@mention resolution** | Bidirectional phone↔name via DB | One-way |
-| **Channels** | 1 (WhatsApp) — channel-agnostic architecture | 25 channels |
-| **AI providers** | 1 (Anthropic) — provider-agnostic architecture | 15+ providers |
+| **Channels** | 3 (WhatsApp, Telegram, Mattermost) — channel-agnostic architecture | 25 channels |
+| **AI providers** | 2 (Anthropic, OpenAI Codex) — provider-agnostic architecture | 15+ providers |
 | **Mobile/desktop apps** | None | iOS, Android, macOS |
-| **Cron/automation** | None | Built-in cron + webhooks |
-| **Subagent spawning** | None | Task decomposition via child agents |
+| **Cron/automation** | Built-in cron with CRUD tools | Built-in cron + webhooks |
+| **Subagent spawning** | Ephemeral subagents with parallel spawning | Task decomposition via child agents |
+| **Agent-to-agent calls** | A2A protocol — agents can invoke other agents | No equivalent |
+| **Installable skills** | Prompt-based skills from URL, GitHub, or local path | No equivalent |
+| **LLM observability** | Opik tracing (prompts, responses, tool calls) + Grafana dashboards | No equivalent |
 
-Lis wins on **depth** — cost optimization, context management, runtime flexibility, and crash safety. OpenClaw wins on **breadth** — more channels, providers, and platform integrations.
+Lis wins on **depth** — cost optimization, context management, runtime flexibility, observability, and crash safety. OpenClaw wins on **breadth** — more channels, providers, and platform integrations.
 
 ## Features
 
@@ -57,7 +60,7 @@ Running an AI agent on a messaging platform means long-lived conversations with 
 - **Tool summarization policies** — per-tool control: `Prune` strips verbose output (file listings, search results), `Summarize` preserves valuable context (memory searches, config reads) in compaction summaries.
 - **Per-message token tracking** — input, output, cache read, cache creation — stored per-message and per-session. `/status` shows real-time cache hit %, token usage, and budget utilization.
 
-### Tools (33 functions across 9 plugins)
+### Tools (~50 functions across 14 plugins)
 
 | Plugin | Functions | What it does |
 |--------|-----------|-------------|
@@ -68,6 +71,11 @@ Running an AI agent on a messaging platform means long-lived conversations with 
 | **Memory** | `mem_create_memory`, `mem_search_memories`, `mem_update_memory`, `mem_delete_memory` | Semantic memory with pgvector + full-text search fallback |
 | **Prompt** | `prompt_list_prompt_sections`, `prompt_get_prompt_section`, `prompt_update_prompt_section` | Runtime-editable system prompt sections — the AI can modify its own instructions |
 | **Config** | `cfg_get_agent_config`, `cfg_update_agent_config`, `cfg_get_chat_config`, `cfg_update_chat_config`, `cfg_add_allowed_sender`, `cfg_remove_allowed_sender`, `cfg_list_allowed_senders`, `cfg_list_chats` | Dynamic per-chat and per-agent configuration without restarts |
+| **Cron** | `cron_create`, `cron_list`, `cron_delete`, `cron_update` | Scheduled tasks with cron expressions, executed by a background service |
+| **Subagent** | `subagent_spawn`, `subagent_spawn_parallel` | Ephemeral subagent spawning for task decomposition |
+| **A2A** | `list_agents`, `get_agent`, `send` | Agent-to-agent communication — invoke other agents with tool execution |
+| **Skills** | `install`, `list`, `uninstall`, `enable`, `disable`, `get`, `use` | Installable prompt-based skills from URL, GitHub repo, or local path |
+| **SendFile** | `send_file` | Send files and images through any channel |
 | **Response** | `resp_react_to_message` | React to messages with emoji by ID |
 | **DateTime** | `dt_get_current_datetime` | Current date/time in agent timezone |
 
@@ -80,6 +88,9 @@ Not every conversation needs the same model, tools, or personality.
 - **Tool profiles** — `minimal` (read-only) → `standard` (general) → `coding` (exec + files) → `full` (everything including browser). Plus per-agent allow/deny glob patterns for fine-grained control.
 - **Create and delete agents** — `/agent new research "Research Assistant"`, `/agent delete research`.
 - **Runtime config editing** — change any setting mid-conversation via tools. The AI can tune its own parameters.
+- **Ephemeral subagents** — spawn child agents for parallel task decomposition. Each subagent runs with its own context and reports back.
+- **Agent-to-agent calls (A2A)** — agents can invoke other agents with full tool execution support.
+- **Installable skills** — prompt-based skills installable from URL, GitHub repo, or local path. Enable, disable, and manage per agent.
 
 ### Security (5-layer defense-in-depth)
 
@@ -122,26 +133,40 @@ Groups aren't second-class citizens. They have dedicated logic for authorization
 - **Context windowing** — keep all bot messages + last N consecutive user messages (default 5, per-chat override). Reduces noise without losing relevant context.
 - **Group metadata injection** — group name and topic fetched from the WhatsApp API, injected into the system prompt so the AI knows where it is.
 
+### Cron & Automation
+
+- **Scheduled tasks** — create recurring jobs with cron expressions via natural conversation.
+- **CRUD tools** — create, list, update, and delete scheduled tasks through the CronPlugin.
+- **Background execution** — CronSchedulerService runs as a hosted service, executing tasks on schedule with owner-level auth.
+
+### Observability
+
+- **Opik LLM tracing** — native REST client captures full agent turns: prompts, responses, tool calls, and A2A invocations. Each conversation turn is a trace with nested spans.
+- **Grafana dashboards** — pre-built dashboards for conversations, channels, database performance, reliability metrics, and error logs.
+- **OpenTelemetry** — traces, metrics, and logs exported via OTLP. GenAI semantic convention tags on all AI operations. Sensitive data (bot tokens, API keys) automatically redacted from trace attributes.
+
 ### Media
 
 - **Image/sticker understanding** — sent to Claude as multimodal content. The AI sees what you send.
 - **Audio transcription** — OpenAI Whisper integration. Audio messages are transcribed and injected inline as `<Audio transcript: ...>`.
-- **Auto-download** — media downloaded from WhatsApp CDN automatically.
+- **File sending** — the AI can send files and images back through any channel via the SendFile plugin.
+- **Auto-download** — media downloaded from channel CDN automatically.
 
 ## Architecture
 
 ```
-WhatsApp ←→ GOWA (Go) ←→ Webhook ←→ Lis.Api (ASP.NET Core)
-                                          ↓
-                                    MessageDebouncer ─── debounce + queue
-                                          ↓
-                                  ConversationService ── context, compaction, sessions
-                                          ↓
-                                      ToolRunner ─────── streaming agentic loop
-                                       ↙     ↘
-                                 Lis.Tools   AI Provider (Anthropic)
-                                    ↓
-                               PostgreSQL ── messages, sessions, memory, agents
+WhatsApp  ←→ GOWA (Go) ──────→ Webhook ─┐
+Telegram  ←→ Polling/Webhook ───────────→├──→ Lis.Api (ASP.NET Core)
+Mattermost ←→ WebSocket ───────────────→┘         ↓
+                                            MessageDebouncer ─── debounce + queue
+                                                   ↓
+                                           ConversationService ── context, compaction, sessions
+                                                   ↓
+                                               ToolRunner ─────── streaming agentic loop
+                                                ↙     ↘
+                                          Lis.Tools   AI Provider (Anthropic / Codex)
+                                             ↓
+                                        PostgreSQL ── messages, sessions, memory, agents, cron
 ```
 
 ### Project Structure
@@ -151,13 +176,13 @@ Lis.Core          — Interfaces, configuration, utilities (no heavy deps)
 Lis.Persistence   — EF Core DbContext, entities, migrations (PostgreSQL)
 Lis.Agent         — Conversation orchestration, context window, compaction, sessions
 Lis.Tools         — Semantic Kernel plugins (exec, fs, browser, web, memory, ...)
-Lis.Providers     — AI provider implementations (Anthropic, extensible)
-Lis.Channels      — Messaging channels (WhatsApp/GOWA, extensible)
+Lis.Providers     — AI provider implementations (Anthropic, OpenAI Codex)
+Lis.Channels      — Messaging channels (WhatsApp, Telegram, Mattermost)
 Lis.Api           — ASP.NET Core host, composition root, Dockerfile
 Lis.Tests         — xUnit test suite
 ```
 
-**Provider-agnostic**: swap AI providers by implementing `IChatClient`. **Channel-agnostic**: add messaging platforms by implementing `IChannelClient`. The conversation engine knows nothing about WhatsApp or Anthropic.
+**Provider-agnostic**: swap AI providers by implementing `IChatClient`. **Channel-agnostic**: add messaging platforms by implementing `IChannelClient`. The conversation engine knows nothing about WhatsApp, Telegram, or Anthropic.
 
 ## Quick Start
 
@@ -216,9 +241,10 @@ jb cleanupcode Lis.Api/Lis.Api.csproj \
 
 All settings are environment variables. See [.env.example](.env.example) for the full list.
 
-### AI Provider
+### AI Providers
 
 ```env
+# Anthropic
 ANTHROPIC_ENABLED=true
 ANTHROPIC_API_KEY=sk-ant-...
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
@@ -226,15 +252,30 @@ ANTHROPIC_MAX_TOKENS=4096
 ANTHROPIC_CONTEXT_BUDGET=128000
 ANTHROPIC_THINKING_EFFORT=medium          # off, low, medium, high, or token count
 ANTHROPIC_CACHE_ENABLED=true
+
+# OpenAI Codex
+CODEX_ENABLED=true
+CODEX_API_KEY=sk-...
+CODEX_MODEL=codex-mini-latest
 ```
 
-### Channel (WhatsApp)
+### Channels
 
 ```env
+# WhatsApp (via GOWA)
 GOWA_ENABLED=true
 GOWA_BASE_URL=http://gowa:3000
 GOWA_WEBHOOK_SECRET=your-secret
 LIS_OWNER_JID=5511999999999@s.whatsapp.net
+
+# Telegram
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_OWNER_IDS=123456789              # comma-separated
+
+# Mattermost
+MATTERMOST_ENABLED=true
+MATTERMOST_BOTS=[{"url":"https://mm.example.com","token":"...","bot_user_id":"..."}]
 ```
 
 ### Context & Cost
@@ -295,13 +336,14 @@ OPENAI_API_KEY=sk-...                    # enables Whisper transcription
 ## Tech Stack
 
 - **Runtime**: .NET 10 / ASP.NET Core
-- **AI**: Microsoft Semantic Kernel + Anthropic SDK
+- **AI**: Microsoft Semantic Kernel + Anthropic SDK + OpenAI Codex
 - **Database**: PostgreSQL + EF Core + pgvector
-- **WhatsApp**: [GOWA](https://github.com/aldinokemal/go-whatsapp-web-multidevice) (Go WhatsApp Web)
+- **Channels**: [GOWA](https://github.com/aldinokemal/go-whatsapp-web-multidevice) (WhatsApp), Telegram Bot API, Mattermost WebSocket
 - **Browser**: Playwright (Chromium)
 - **Search**: Brave Search API
 - **Transcription**: OpenAI Whisper
-- **Deployment**: Docker Compose
+- **Observability**: OpenTelemetry + Grafana + Opik
+- **Deployment**: Docker Compose + GitHub Actions CI/CD
 
 ## License
 
