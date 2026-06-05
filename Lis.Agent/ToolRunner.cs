@@ -159,21 +159,33 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 
 			return await call.InvokeAsync(kernel, ct);
 		} catch (Exception ex) {
+			string plugin = call.PluginName ?? ResolvePluginName(kernel, call.FunctionName);
+			string args   = call.Arguments is not null
+				? System.Text.Json.JsonSerializer.Serialize(call.Arguments)
+				: "(unparseable)";
+
 			if (ex is KeyNotFoundException)
-				logger.LogWarning(ex, "Tried to execute tool '{Tool}' but it does not exist", call.FunctionName);
+				logger.LogWarning(ex, "Tried to execute tool '{Plugin}.{Tool}' but it does not exist", plugin, call.FunctionName);
 			else if (ex is ArgumentException or ArgumentNullException
 			         || ex.InnerException is ArgumentException or ArgumentNullException)
 				logger.LogWarning(ex, "Tried to execute tool '{Plugin}.{Tool}' without the needed arguments. Provided: {Arguments}",
-					call.PluginName, call.FunctionName,
-					call.Arguments is not null ? System.Text.Json.JsonSerializer.Serialize(call.Arguments) : "(null)");
-			else if (ex.InnerException is System.Text.Json.JsonException)
-				logger.LogWarning(ex, "Model produced invalid JSON arguments for tool '{Plugin}.{Tool}'. Arguments: {Arguments}",
-					call.PluginName, call.FunctionName,
-					call.Arguments is not null ? System.Text.Json.JsonSerializer.Serialize(call.Arguments) : "(null)");
+					plugin, call.FunctionName, args);
+			else if (ex.InnerException is System.Text.Json.JsonException jsonEx)
+				logger.LogWarning(ex, "Model produced invalid JSON arguments for tool '{Plugin}.{Tool}'. " +
+				                      "JsonError: {JsonError}, path: {JsonPath}, line: {JsonLine}",
+					plugin, call.FunctionName, jsonEx.Message, jsonEx.Path, jsonEx.LineNumber);
 			else
-				logger.LogError(ex, "Error executing tool '{Tool}'", call.FunctionName);
+				logger.LogError(ex, "Error executing tool '{Plugin}.{Tool}'", plugin, call.FunctionName);
 
 			return new FunctionResultContent(call, ex.Message);
 		}
+	}
+
+	private static string ResolvePluginName(Kernel kernel, string? functionName) {
+		if (functionName is null) return "unknown";
+		foreach (KernelPlugin plugin in kernel.Plugins)
+			if (plugin.Contains(functionName))
+				return plugin.Name;
+		return "unknown";
 	}
 }
