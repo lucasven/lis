@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 using YamlDotNet.Serialization;
@@ -87,7 +88,9 @@ public static partial class SkillParser {
 
 		if (body.Length > MaxContentLength)
 			return SkillParseResult.Failure(
-				$"Skill content exceeds the maximum of {MaxContentLength:N0} characters ({body.Length:N0} provided).");
+				string.Format(CultureInfo.InvariantCulture,
+					"Skill content exceeds the maximum of {0:N0} characters ({1:N0} provided).",
+					MaxContentLength, body.Length));
 
 		int version = 1;
 		if (frontMatter.TryGetValue("version", out object? verObj) && verObj is not null) {
