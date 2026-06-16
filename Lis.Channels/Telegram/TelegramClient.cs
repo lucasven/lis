@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 using Lis.Core.Channel;
 using Lis.Core.Util;
@@ -13,6 +14,8 @@ namespace Lis.Channels.Telegram;
 
 public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter formatter, ILogger<TelegramClient> logger) : IChannelClient {
 
+	private const int MaxMessageLength = 4096;
+
 	[Trace("TelegramClient > SendMessageAsync")]
 	public async Task<string?> SendMessageAsync(
 		string chatId, string message, string? replyToId = null, CancellationToken ct = default) {
@@ -20,25 +23,63 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 		Activity.Current?.SetTag("chat.id", chatId);
 		Activity.Current?.SetTag("message.length", message.Length);
 
-		string             formatted = formatter.Format(message);
-		long               chatIdNum = long.Parse(chatId);
-		ReplyParameters?   reply     = replyToId is not null
+		string           formatted = formatter.Format(message);
+		long             chatIdNum = long.Parse(chatId);
+		ReplyParameters? reply     = replyToId is not null
 			? new ReplyParameters { MessageId = int.Parse(replyToId) }
 			: null;
 
-		try {
-			Message sent = await bot.SendMessage(
-				chatId: chatIdNum, text: formatted, parseMode: ParseMode.MarkdownV2,
-				replyParameters: reply, cancellationToken: ct);
-			return sent.MessageId.ToString();
+		List<string> chunks = SplitMessage(formatted);
+		Activity.Current?.SetTag("message.chunks", chunks.Count);
+
+		string? lastId = null;
+		for (int i = 0; i < chunks.Count; i++) {
+			try {
+				Message sent = await bot.SendMessage(
+					chatId: chatIdNum, text: chunks[i], parseMode: ParseMode.MarkdownV2,
+					replyParameters: reply, cancellationToken: ct);
+				lastId = sent.MessageId.ToString();
+			}
+			catch (global::Telegram.Bot.Exceptions.ApiRequestException ex) when (ex.ErrorCode == 400) {
+				logger.LogWarning(ex, "MarkdownV2 failed for chunk {Chunk}/{Total}, retrying as plain text", i + 1, chunks.Count);
+				string fallback = chunks.Count == 1 ? message : chunks[i];
+				Message sent = await bot.SendMessage(
+					chatId: chatIdNum, text: fallback,
+					replyParameters: reply, cancellationToken: ct);
+				lastId = sent.MessageId.ToString();
+			}
+			reply = null;
 		}
-		catch (global::Telegram.Bot.Exceptions.ApiRequestException ex) when (ex.ErrorCode == 400) {
-			logger.LogWarning(ex, "MarkdownV2 formatting failed, retrying as plain text");
-			Message sent = await bot.SendMessage(
-				chatId: chatIdNum, text: message,
-				replyParameters: reply, cancellationToken: ct);
-			return sent.MessageId.ToString();
+		return lastId;
+	}
+
+	internal static List<string> SplitMessage(string text) {
+		if (text.Length <= MaxMessageLength) return [text];
+
+		List<string>  chunks      = [];
+		string[]      lines       = text.Split('\n');
+		StringBuilder current     = new();
+		bool          inCodeBlock = false;
+
+		foreach (string line in lines) {
+			int lineLen  = current.Length == 0 ? line.Length : 1 + line.Length;
+			int overhead = inCodeBlock ? 4 : 0;
+
+			if (current.Length > 0 && current.Length + lineLen + overhead > MaxMessageLength) {
+				if (inCodeBlock) current.Append("\n```");
+				chunks.Add(current.ToString());
+				current.Clear();
+				if (inCodeBlock) current.Append("```");
+			}
+
+			if (current.Length > 0) current.Append('\n');
+			current.Append(line);
+
+			if (line.StartsWith("```")) inCodeBlock = !inCodeBlock;
 		}
+
+		if (current.Length > 0) chunks.Add(current.ToString());
+		return chunks;
 	}
 
 	[Trace("TelegramClient > SetTypingAsync")]
