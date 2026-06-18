@@ -80,12 +80,13 @@ public sealed class TelegramPollingService(
 			Timestamp      = new DateTimeOffset(msg.Date, TimeSpan.Zero),
 			IsFromMe       = false,
 			IsGroup        = isGroup,
-			Body           = msg.Text ?? msg.Caption,
+			Body           = msg.Text,
 			RepliedId      = msg.ReplyToMessage?.MessageId.ToString(),
 			RepliedContent = msg.ReplyToMessage?.Text,
 			IsBotMentioned = isBotMentioned,
 			ChatName       = isGroup ? msg.Chat.Title : null,
 			MediaType      = mediaType,
+			MediaCaption   = msg.Caption,
 			MediaPath      = mediaPath,
 			Channel        = "telegram"
 		};
