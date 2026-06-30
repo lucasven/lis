@@ -33,52 +33,10 @@ public class TelegramWebhookController(
 			return this.Ok();
 
 		Message msg = update.Message;
-		if (msg.Text is null && msg.Photo is null && msg.Voice is null && msg.Document is null)
+		if (!TelegramMessageMapper.HasContent(msg))
 			return this.Ok();
 
-		bool isGroup       = msg.Chat.Type is ChatType.Group or ChatType.Supergroup;
-		bool isBotMentioned = false;
-
-		// Check for bot mention in entities
-		if (msg.Entities is not null) {
-			foreach (MessageEntity entity in msg.Entities) {
-				if (entity.Type == MessageEntityType.Mention)
-					isBotMentioned = true;
-			}
-		}
-
-		// Determine media info
-		string? mediaType = null;
-		string? mediaPath = null;
-		if (msg.Photo is { Length: > 0 }) {
-			mediaType = "image";
-			mediaPath = msg.Photo[^1].FileId; // Largest photo size
-		} else if (msg.Voice is not null) {
-			mediaType = "audio";
-			mediaPath = msg.Voice.FileId;
-		} else if (msg.Document is not null) {
-			mediaType = "document";
-			mediaPath = msg.Document.FileId;
-		}
-
-		IncomingMessage message = new() {
-			ExternalId     = msg.MessageId.ToString(),
-			ChatId         = msg.Chat.Id.ToString(),
-			SenderId       = msg.From?.Id.ToString() ?? "",
-			SenderName     = BuildSenderName(msg.From),
-			Timestamp      = new DateTimeOffset(msg.Date, TimeSpan.Zero),
-			IsFromMe       = false,
-			IsGroup        = isGroup,
-			Body           = msg.Text,
-			RepliedId      = msg.ReplyToMessage?.MessageId.ToString(),
-			RepliedContent = msg.ReplyToMessage?.Text,
-			IsBotMentioned = isBotMentioned,
-			ChatName       = isGroup ? msg.Chat.Title : null,
-			MediaType      = mediaType,
-			MediaCaption   = msg.Caption,
-			MediaPath      = mediaPath,
-			Channel        = "telegram"
-		};
+		IncomingMessage message = TelegramMessageMapper.Map(msg);
 
 		_ = Task.Run(async () => {
 			try {
@@ -89,12 +47,5 @@ public class TelegramWebhookController(
 		});
 
 		return this.Ok();
-	}
-
-	private static string? BuildSenderName(User? user) {
-		if (user is null) return null;
-		string name = user.FirstName;
-		if (user.LastName is { Length: > 0 }) name += $" {user.LastName}";
-		return name;
 	}
 }

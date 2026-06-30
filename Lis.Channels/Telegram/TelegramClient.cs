@@ -125,9 +125,45 @@ public sealed class TelegramClient(TelegramBotClient bot, TelegramFormatter form
 		return new MediaDownload(data, mimeType);
 	}
 
-	public Task<string?> SendFileAsync(string chatId, MediaUpload media,
-		string? caption = null, string? replyToId = null, CancellationToken ct = default) =>
-		throw new NotSupportedException("File sending is not supported on Telegram yet.");
+	private const int MaxCaptionLength = 1024;
+
+	[Trace("TelegramClient > SendFileAsync")]
+	public async Task<string?> SendFileAsync(string chatId, MediaUpload media,
+		string? caption = null, string? replyToId = null, CancellationToken ct = default) {
+
+		Activity.Current?.SetTag("chat.id", chatId);
+		Activity.Current?.SetTag("file.mime_type", media.MimeType);
+		Activity.Current?.SetTag("file.size", media.Data.Length);
+
+		long             chatIdNum = long.Parse(chatId);
+		ReplyParameters? reply     = replyToId is not null
+			? new ReplyParameters { MessageId = int.Parse(replyToId) }
+			: null;
+
+		// Captions are capped at 1024 chars; anything longer is sent as a separate follow-up message.
+		string? fileCaption = caption is { Length: > MaxCaptionLength } ? null : caption;
+
+		string    filename = media.ResolveFilename();
+		using MemoryStream ms = new(media.Data);
+		InputFile input = InputFile.FromStream(ms, filename);
+
+		string mime = media.MimeType.ToLowerInvariant();
+		Message sent = mime switch {
+			"image/gif"                  => await bot.SendAnimation(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct),
+			_ when mime.StartsWith("image/") => await bot.SendPhoto(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct),
+			"audio/ogg"                  => await bot.SendVoice(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct),
+			_ when mime.StartsWith("audio/") => await bot.SendAudio(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct),
+			_ when mime.StartsWith("video/") => await bot.SendVideo(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct),
+			_                            => await bot.SendDocument(chatIdNum, input, caption: fileCaption, replyParameters: reply, cancellationToken: ct)
+		};
+
+		string messageId = sent.MessageId.ToString();
+
+		if (fileCaption is null && caption is { Length: > 0 })
+			await this.SendMessageAsync(chatId, caption, messageId, ct);
+
+		return messageId;
+	}
 
 	private static string GuessMimeType(string path) => Path.GetExtension(path).ToLowerInvariant() switch {
 		".jpg" or ".jpeg" => "image/jpeg",
