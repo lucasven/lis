@@ -46,50 +46,9 @@ public sealed class TelegramPollingService(
 		if (update.Type != UpdateType.Message || update.Message is null) return;
 
 		Message msg = update.Message;
-		if (msg.Text is null && msg.Photo is null && msg.Voice is null && msg.Document is null)
-			return;
+		if (!TelegramMessageMapper.HasContent(msg)) return;
 
-		bool isGroup       = msg.Chat.Type is ChatType.Group or ChatType.Supergroup;
-		bool isBotMentioned = false;
-
-		if (msg.Entities is not null) {
-			foreach (MessageEntity entity in msg.Entities) {
-				if (entity.Type == MessageEntityType.Mention)
-					isBotMentioned = true;
-			}
-		}
-
-		string? mediaType = null;
-		string? mediaPath = null;
-		if (msg.Photo is { Length: > 0 }) {
-			mediaType = "image";
-			mediaPath = msg.Photo[^1].FileId;
-		} else if (msg.Voice is not null) {
-			mediaType = "audio";
-			mediaPath = msg.Voice.FileId;
-		} else if (msg.Document is not null) {
-			mediaType = "document";
-			mediaPath = msg.Document.FileId;
-		}
-
-		IncomingMessage message = new() {
-			ExternalId     = msg.MessageId.ToString(),
-			ChatId         = msg.Chat.Id.ToString(),
-			SenderId       = msg.From?.Id.ToString() ?? "",
-			SenderName     = BuildSenderName(msg.From),
-			Timestamp      = new DateTimeOffset(msg.Date, TimeSpan.Zero),
-			IsFromMe       = false,
-			IsGroup        = isGroup,
-			Body           = msg.Text,
-			RepliedId      = msg.ReplyToMessage?.MessageId.ToString(),
-			RepliedContent = msg.ReplyToMessage?.Text,
-			IsBotMentioned = isBotMentioned,
-			ChatName       = isGroup ? msg.Chat.Title : null,
-			MediaType      = mediaType,
-			MediaCaption   = msg.Caption,
-			MediaPath      = mediaPath,
-			Channel        = "telegram"
-		};
+		IncomingMessage message = TelegramMessageMapper.Map(msg);
 
 		_ = Task.Run(async () => {
 			try {
@@ -98,12 +57,5 @@ public sealed class TelegramPollingService(
 				logger.LogError(ex, "Error processing Telegram message {MessageId}", msg.MessageId);
 			}
 		});
-	}
-
-	private static string? BuildSenderName(User? user) {
-		if (user is null) return null;
-		string name = user.FirstName;
-		if (user.LastName is { Length: > 0 }) name += $" {user.LastName}";
-		return name;
 	}
 }
