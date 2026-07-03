@@ -131,6 +131,8 @@ public sealed partial class PinchtabProcessManager(
 		} catch (Exception) {
 			try { proc.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
 		}
+
+		proc.Dispose();
 	}
 
 	private async Task EnsureConfigFileAsync() {

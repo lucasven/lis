@@ -7,6 +7,7 @@ using Lis.Core.Configuration;
 using Lis.Core.Util;
 using Lis.Persistence;
 using Lis.Persistence.Entities;
+using Lis.Tools.Pinchtab;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -194,10 +195,15 @@ public sealed class A2aClientTests : IDisposable {
 			Options.Create(new LisOptions()),
 			NullLogger<PromptComposer>.Instance);
 
+		PinchtabInstanceManager pinchtabInstances = new(
+			new FakeNullPinchtabClient(),
+			NullLogger<PinchtabInstanceManager>.Instance);
+
 		return new A2aClient(
 			sp.GetRequiredService<IServiceScopeFactory>(),
 			sp,
 			composer,
+			pinchtabInstances,
 			NullLogger<A2aClient>.Instance);
 	}
 
@@ -267,5 +273,23 @@ public sealed class A2aClientTests : IDisposable {
 
 		public Task<bool> ResolveByMessageAsync(string messageExternalId, ApprovalDecision decision, string senderJid) =>
 			Task.FromResult(true);
+	}
+
+	private sealed class FakeNullPinchtabClient : IPinchtabClient {
+		public Task<bool>              IsHealthyAsync(CancellationToken ct = default)                                      => Task.FromResult(true);
+		public Task<PinchtabProfile?>  FindProfileAsync(string name, CancellationToken ct = default)                       => Task.FromResult<PinchtabProfile?>(null);
+		public Task<PinchtabProfile>   CreateProfileAsync(string name, CancellationToken ct = default)                     => Task.FromResult(new PinchtabProfile("p1", name));
+		public Task                    StopProfileAsync(string profileId, CancellationToken ct = default)                  => Task.CompletedTask;
+		public Task<PinchtabInstance>  StartInstanceAsync(string profileId, bool headed, CancellationToken ct = default)   => Task.FromResult(new PinchtabInstance("i1", profileId, "9999", "running"));
+		public Task<PinchtabInstance?> GetInstanceAsync(string instanceId, CancellationToken ct = default)                 => Task.FromResult<PinchtabInstance?>(null);
+		public Task                    StopInstanceAsync(string instanceId, CancellationToken ct = default)                => Task.CompletedTask;
+		public Task<PinchtabTab>       OpenTabAsync(string instanceId, string url, CancellationToken ct = default)         => Task.FromResult(new PinchtabTab("t1", url, "Title"));
+		public Task<string>            ListTabsAsync(string instanceId, CancellationToken ct = default)                    => Task.FromResult("[]");
+		public Task<string>            NavigateAsync(string tabId, string url, CancellationToken ct = default)             => Task.FromResult("{}");
+		public Task<string>            SnapshotAsync(string tabId, string filter, int maxTokens, CancellationToken ct = default) => Task.FromResult("");
+		public Task<string>            ActionAsync(string tabId, object payload, CancellationToken ct = default)           => Task.FromResult("{}");
+		public Task<string>            EvaluateAsync(string tabId, string expression, CancellationToken ct = default)      => Task.FromResult("{}");
+		public Task<byte[]>            ScreenshotAsync(string tabId, CancellationToken ct = default)                       => Task.FromResult(Array.Empty<byte>());
+		public Task                    ShutdownAsync(CancellationToken ct = default)                                       => Task.CompletedTask;
 	}
 }

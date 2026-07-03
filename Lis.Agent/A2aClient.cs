@@ -7,6 +7,7 @@ using Lis.Core.Configuration;
 using Lis.Core.Util;
 using Lis.Persistence;
 using Lis.Persistence.Entities;
+using Lis.Tools.Pinchtab;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -20,11 +21,12 @@ using FunctionResultContent = Microsoft.SemanticKernel.FunctionResultContent;
 
 namespace Lis.Agent;
 
-public sealed class A2aClient(
-	IServiceScopeFactory scopeFactory,
-	IServiceProvider     serviceProvider,
-	PromptComposer       promptComposer,
-	ILogger<A2aClient>   logger) : IA2aClient {
+public sealed partial class A2aClient(
+	IServiceScopeFactory    scopeFactory,
+	IServiceProvider        serviceProvider,
+	PromptComposer          promptComposer,
+	PinchtabInstanceManager pinchtabInstances,
+	ILogger<A2aClient>      logger) : IA2aClient {
 
 	private const int MaxDepth = 3;
 	private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -129,36 +131,42 @@ public sealed class A2aClient(
 			string?     lastAssistantContent = null;
 			TokenUsage? lastUsage            = null;
 
-			await foreach (ChatMessageContent msg in toolRunner.RunAsync(
-				chatService, history, agentKernel, settings, usageExtractor, ct)) {
+			try {
+				await foreach (ChatMessageContent msg in toolRunner.RunAsync(
+					chatService, history, agentKernel, settings, usageExtractor, ct)) {
 
-				TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
+					TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
 
-				if (msg.Role == AuthorRole.Assistant) {
-					if (!string.IsNullOrWhiteSpace(msg.Content))
-						lastAssistantContent = msg.Content;
+					if (msg.Role == AuthorRole.Assistant) {
+						if (!string.IsNullOrWhiteSpace(msg.Content))
+							lastAssistantContent = msg.Content;
 
-					if (msgUsage is not null) {
-						lastUsage = msgUsage;
-						tracer?.EndLlmSpan(msg, msgUsage);
-					} else {
-						tracer?.StartLlmSpan(modelSettings.Model, agent.Provider, history);
+						if (msgUsage is not null) {
+							lastUsage = msgUsage;
+							tracer?.EndLlmSpan(msg, msgUsage);
+						} else {
+							tracer?.StartLlmSpan(modelSettings.Model, agent.Provider, history);
+						}
 					}
-				}
 
-				if (msg.Role == AuthorRole.Tool) {
-					foreach (KernelContent item in msg.Items) {
-						if (item is FunctionResultContent fr) {
-							FunctionCallContent? matchingCall = null;
-							foreach (ChatMessageContent prev in history.AsEnumerable().Reverse()) {
-								matchingCall = prev.Items.OfType<FunctionCallContent>()
-									.FirstOrDefault(c => c.Id == fr.CallId);
-								if (matchingCall is not null) break;
+					if (msg.Role == AuthorRole.Tool) {
+						foreach (KernelContent item in msg.Items) {
+							if (item is FunctionResultContent fr) {
+								FunctionCallContent? matchingCall = null;
+								foreach (ChatMessageContent prev in history.AsEnumerable().Reverse()) {
+									matchingCall = prev.Items.OfType<FunctionCallContent>()
+										.FirstOrDefault(c => c.Id == fr.CallId);
+									if (matchingCall is not null) break;
+								}
+								if (matchingCall is not null) tracer?.RecordToolSpan(matchingCall, fr);
 							}
-							if (matchingCall is not null) tracer?.RecordToolSpan(matchingCall, fr);
 						}
 					}
 				}
+			} finally {
+				// Close the target agent's pinchtab browser instance at the end of the A2A call
+				try { await pinchtabInstances.CloseForAgentAsync(agent.Id); }
+				catch (Exception ex) { LogPinchtabCloseFailed(logger, ex, agent.Id); }
 			}
 
 			List<Part> responseParts = [];
@@ -241,4 +249,7 @@ public sealed class A2aClient(
 
 		return sb.ToString();
 	}
+
+	[LoggerMessage(Level = LogLevel.Warning, Message = "Failed to close pinchtab instance for agent {AgentId}")]
+	private static partial void LogPinchtabCloseFailed(ILogger logger, Exception ex, long agentId);
 }
