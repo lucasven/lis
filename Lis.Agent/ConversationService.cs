@@ -10,6 +10,7 @@ using Lis.Core.Configuration;
 using Lis.Core.Util;
 using Lis.Persistence;
 using Lis.Persistence.Entities;
+using Lis.Tools.Pinchtab;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -40,6 +41,7 @@ public sealed partial class ConversationService(
 	IApprovalService             approvalService,
 	ToolPolicyService            toolPolicyService,
 	ErrorSuppressionService      errorSuppression,
+	PinchtabInstanceManager      pinchtabInstances,
 	OpikTracer?                  opikTracer,
 	IOptions<LisOptions>         lisOptions,
 	ILogger<ConversationService> logger) : IConversationService {
@@ -364,6 +366,10 @@ public sealed partial class ConversationService(
 		} catch (OperationCanceledException) {
 			if (opikTracer is not null) await opikTracer.EndTraceAsync(null, lastUsage);
 			throw;
+		} finally {
+			// Close the agent's pinchtab browser instance at the end of the conversation turn
+			try { await pinchtabInstances.CloseForAgentAsync(agent.Id); }
+			catch (Exception ex) { logger.LogWarning(ex, "Failed to close pinchtab instance for agent {AgentId}", agent.Id); }
 		}
 
 		// Clear typing indicator if no message was sent (NO_RESPONSE)
