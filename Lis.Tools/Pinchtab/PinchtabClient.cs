@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Lis.Core.Util;
 
 namespace Lis.Tools.Pinchtab;
 
@@ -41,6 +42,7 @@ public sealed class PinchtabClient(
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
 	};
 
+	[Trace("PinchtabClient > IsHealthyAsync")]
 	public async Task<bool> IsHealthyAsync(CancellationToken ct = default) {
 		try {
 			using HttpClient client = this.CreateClient();
@@ -51,6 +53,7 @@ public sealed class PinchtabClient(
 		}
 	}
 
+	[Trace("PinchtabClient > FindProfileAsync")]
 	public async Task<PinchtabProfile?> FindProfileAsync(string name, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync("/profiles", ct);
@@ -60,6 +63,7 @@ public sealed class PinchtabClient(
 		return profiles?.FirstOrDefault(p => p.Name == name);
 	}
 
+	[Trace("PinchtabClient > CreateProfileAsync")]
 	public async Task<PinchtabProfile> CreateProfileAsync(string name, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync("/profiles", new { name }, Json, ct);
@@ -69,12 +73,14 @@ public sealed class PinchtabClient(
 			?? throw new InvalidOperationException("Empty response creating pinchtab profile.");
 	}
 
+	[Trace("PinchtabClient > StopProfileAsync")]
 	public async Task StopProfileAsync(string profileId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync($"/profiles/{profileId}/stop", content: null, ct);
 		response.EnsureSuccessStatusCode();
 	}
 
+	[Trace("PinchtabClient > StartInstanceAsync")]
 	public async Task<PinchtabInstance> StartInstanceAsync(string profileId, bool headed, CancellationToken ct = default) {
 		var body = new {
 			profileId,
@@ -90,6 +96,7 @@ public sealed class PinchtabClient(
 			?? throw new InvalidOperationException("Empty response starting pinchtab instance.");
 	}
 
+	[Trace("PinchtabClient > GetInstanceAsync")]
 	public async Task<PinchtabInstance?> GetInstanceAsync(string instanceId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync($"/instances/{instanceId}", ct);
@@ -98,12 +105,14 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadFromJsonAsync<PinchtabInstance>(Json, ct);
 	}
 
+	[Trace("PinchtabClient > StopInstanceAsync")]
 	public async Task StopInstanceAsync(string instanceId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync($"/instances/{instanceId}/stop", content: null, ct);
 		response.EnsureSuccessStatusCode();
 	}
 
+	[Trace("PinchtabClient > OpenTabAsync")]
 	public async Task<PinchtabTab> OpenTabAsync(string instanceId, string url, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/instances/{instanceId}/tabs/open", new { url }, Json, ct);
@@ -113,6 +122,7 @@ public sealed class PinchtabClient(
 			?? throw new InvalidOperationException("Empty response opening pinchtab tab.");
 	}
 
+	[Trace("PinchtabClient > ListTabsAsync")]
 	public async Task<string> ListTabsAsync(string instanceId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync($"/instances/{instanceId}/tabs", ct);
@@ -121,6 +131,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsStringAsync(ct);
 	}
 
+	[Trace("PinchtabClient > NavigateAsync")]
 	public async Task<string> NavigateAsync(string tabId, string url, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/navigate", new { url }, Json, ct);
@@ -129,6 +140,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsStringAsync(ct);
 	}
 
+	[Trace("PinchtabClient > SnapshotAsync")]
 	public async Task<string> SnapshotAsync(string tabId, string filter, int maxTokens, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		string query = $"/tabs/{tabId}/snapshot?filter={Uri.EscapeDataString(filter)}&format=compact&maxTokens={maxTokens}";
@@ -138,6 +150,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsStringAsync(ct);
 	}
 
+	[Trace("PinchtabClient > ActionAsync")]
 	public async Task<string> ActionAsync(string tabId, object payload, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/action", payload, Json, ct);
@@ -146,6 +159,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsStringAsync(ct);
 	}
 
+	[Trace("PinchtabClient > EvaluateAsync")]
 	public async Task<string> EvaluateAsync(string tabId, string expression, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/evaluate", new { expression }, Json, ct);
@@ -154,6 +168,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsStringAsync(ct);
 	}
 
+	[Trace("PinchtabClient > ScreenshotAsync")]
 	public async Task<byte[]> ScreenshotAsync(string tabId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync($"/tabs/{tabId}/screenshot?format=png&raw=true", ct);
@@ -162,6 +177,7 @@ public sealed class PinchtabClient(
 		return await response.Content.ReadAsByteArrayAsync(ct);
 	}
 
+	[Trace("PinchtabClient > ShutdownAsync")]
 	public async Task ShutdownAsync(CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync("/shutdown", content: null, ct);
