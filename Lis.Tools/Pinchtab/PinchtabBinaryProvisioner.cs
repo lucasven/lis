@@ -44,12 +44,17 @@ public sealed partial class PinchtabBinaryProvisioner(
 
 		// Download to a temp file first so a failed download never leaves a broken binary
 		string tempPath = options.BinaryPath + ".tmp";
-		await using (Stream download = await client.GetStreamAsync(url, ct))
-		await using (FileStream file = File.Create(tempPath)) {
-			await download.CopyToAsync(file, ct);
-		}
+		try {
+			await using (Stream download = await client.GetStreamAsync(url, ct))
+			await using (FileStream file = File.Create(tempPath)) {
+				await download.CopyToAsync(file, ct);
+			}
 
-		File.Move(tempPath, options.BinaryPath, overwrite: true);
+			File.Move(tempPath, options.BinaryPath, overwrite: true);
+		} catch {
+			if (File.Exists(tempPath)) File.Delete(tempPath);
+			throw;
+		}
 
 		if (!OperatingSystem.IsWindows())
 			File.SetUnixFileMode(options.BinaryPath,
