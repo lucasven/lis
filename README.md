@@ -66,8 +66,8 @@ Running an AI agent on a messaging platform means long-lived conversations with 
 |--------|-----------|-------------|
 | **Exec** | `exec_run_command` | Shell execution (bash/cmd) with timeout, output cap, and workspace sandbox |
 | **FileSystem** | `fs_read_file`, `fs_write_file`, `fs_edit_file`, `fs_list_directory`, `fs_search_files` | File operations with symlink-aware path validation |
-| **Browser** | `browser_start`, `browser_navigate`, `browser_snapshot`, `browser_screenshot`, `browser_click`, `browser_type`, `browser_evaluate`, `browser_tabs`, `browser_close` | Headless Chromium automation via Playwright |
-| **Web** | `web_search`, `web_fetch` | Brave Search API + URL fetch with HTML stripping |
+| **Browser** | `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_press`, `browser_scroll`, `browser_screenshot`, `browser_eval`, `browser_tabs` | Chrome automation via [PinchTab](https://pinchtab.com), per-agent profiles |
+| **Web** | `web_search` | Brave Search API |
 | **Memory** | `mem_create_memory`, `mem_search_memories`, `mem_update_memory`, `mem_delete_memory` | Semantic memory with pgvector + full-text search fallback |
 | **Prompt** | `prompt_list_prompt_sections`, `prompt_get_prompt_section`, `prompt_update_prompt_section` | Runtime-editable system prompt sections — the AI can modify its own instructions |
 | **Config** | `cfg_get_agent_config`, `cfg_update_agent_config`, `cfg_get_chat_config`, `cfg_update_chat_config`, `cfg_add_allowed_sender`, `cfg_remove_allowed_sender`, `cfg_list_allowed_senders`, `cfg_list_chats` | Dynamic per-chat and per-agent configuration without restarts |
@@ -326,7 +326,7 @@ OPENAI_API_KEY=sk-...                    # enables Whisper transcription
 | [GROUPS.md](docs/GROUPS.md) | Group authorization, mention detection, context windowing |
 | [SESSIONS.md](docs/SESSIONS.md) | Session lifecycle, `/resume`, semantic search |
 | [MEDIA_HANDLING.md](docs/MEDIA_HANDLING.md) | Image vision, audio transcription, media download |
-| [BROWSER.md](docs/BROWSER.md) | Headless Chromium automation via Playwright |
+| [BROWSER.md](docs/BROWSER.md) | Chrome automation via PinchTab |
 | [EXEC_APPROVALS.md](docs/EXEC_APPROVALS.md) | Shell command approval workflow |
 | [MESSAGE_QUEUE.md](docs/MESSAGE_QUEUE.md) | Crash-safe queuing, `/abort`, flush loop |
 | [MESSAGE_FORMATTING.md](docs/MESSAGE_FORMATTING.md) | Markdown → WhatsApp conversion |
@@ -339,7 +339,7 @@ OPENAI_API_KEY=sk-...                    # enables Whisper transcription
 - **AI**: Microsoft Semantic Kernel + Anthropic SDK + OpenAI Codex
 - **Database**: PostgreSQL + EF Core + pgvector
 - **Channels**: [GOWA](https://github.com/aldinokemal/go-whatsapp-web-multidevice) (WhatsApp), Telegram Bot API, Mattermost WebSocket
-- **Browser**: Playwright (Chromium)
+- **Browser**: PinchTab (Chrome)
 - **Search**: Brave Search API
 - **Transcription**: OpenAI Whisper
 - **Observability**: OpenTelemetry + Grafana + Opik
