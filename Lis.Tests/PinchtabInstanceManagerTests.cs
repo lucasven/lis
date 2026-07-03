@@ -73,6 +73,7 @@ public class PinchtabInstanceManagerTests {
 		Assert.False(client.Started[0].Headed);
 		Assert.NotNull(session.InstanceId);
 		Assert.False(session.Headed);
+		Assert.Contains(client.Profiles[0].Id, client.StoppedProfiles);
 	}
 
 	[Fact]
@@ -111,6 +112,7 @@ public class PinchtabInstanceManagerTests {
 
 		Assert.NotSame(first, second);
 		Assert.Equal(2, client.Started.Count);
+		Assert.Equal(2, client.StoppedProfiles.Count);
 	}
 
 	[Fact]

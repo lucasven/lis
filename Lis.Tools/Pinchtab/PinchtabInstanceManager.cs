@@ -19,15 +19,12 @@ public sealed class AgentBrowserSession {
 /// </summary>
 public sealed partial class PinchtabInstanceManager(
 	IPinchtabClient                  client,
-	ILogger<PinchtabInstanceManager> logger) : IAsyncDisposable {
+	ILogger<PinchtabInstanceManager> logger) : IDisposable {
 
 	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions = new();
 	private readonly SemaphoreSlim gate = new(1, 1);
 
-	public ValueTask DisposeAsync() {
-		this.gate.Dispose();
-		return ValueTask.CompletedTask;
-	}
+	public void Dispose() => this.gate.Dispose();
 
 	[Trace("PinchtabInstanceManager > EnsureSessionAsync")]
 	public async Task<AgentBrowserSession> EnsureSessionAsync(long agentId, bool headed, CancellationToken ct) {
@@ -49,7 +46,7 @@ public sealed partial class PinchtabInstanceManager(
 			string profileId = await this.EnsureProfileAsync(agentId, ct);
 
 			// A profile can only have one active instance; stop any stale one (ignore errors)
-			try { await client.StopProfileAsync(profileId, ct); } catch (HttpRequestException) { }
+			try { await client.StopProfileAsync(profileId, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { }
 
 			PinchtabInstance instance = await client.StartInstanceAsync(profileId, headed, ct);
 			instance = await this.WaitRunningAsync(instance, ct);
@@ -68,13 +65,18 @@ public sealed partial class PinchtabInstanceManager(
 
 	[Trace("PinchtabInstanceManager > CloseForAgentAsync")]
 	public async Task CloseForAgentAsync(long agentId) {
-		if (!this.sessions.TryRemove(agentId, out AgentBrowserSession? session)) return;
-
+		await this.gate.WaitAsync();
 		try {
-			await client.StopInstanceAsync(session.InstanceId);
-			LogClosed(logger, agentId, session.InstanceId);
-		} catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) {
-			LogCloseFailed(logger, ex, agentId, session.InstanceId);
+			if (!this.sessions.TryRemove(agentId, out AgentBrowserSession? session)) return;
+
+			try {
+				await client.StopInstanceAsync(session.InstanceId);
+				LogClosed(logger, agentId, session.InstanceId);
+			} catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) {
+				LogCloseFailed(logger, ex, agentId, session.InstanceId);
+			}
+		} finally {
+			this.gate.Release();
 		}
 	}
 
