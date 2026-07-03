@@ -100,25 +100,24 @@ All paths are resolved relative to the agent's workspace and sandboxed: symlinks
 | Function | Description | Auth |
 |----------|-------------|------|
 | `search` | Web search via Brave Search API (1-10 results) | Open |
-| `fetch` | Fetch a URL, strip HTML tags, return plain text (max 50 KB) | Open |
 
-Requires `LIS_WEB_SEARCH_ENABLED=true` and `LIS_WEB_SEARCH_API_KEY` for search.
+Requires `LIS_WEB_SEARCH_ENABLED=true` and `LIS_WEB_SEARCH_API_KEY`. To read page content, use the browser tools.
 
 ### BrowserPlugin (`browser`)
 
 | Function | Description | Auth |
 |----------|-------------|------|
-| `start` | Launch headless Chromium, optionally navigate to URL | OwnerOnly |
-| `navigate` | Navigate to URL with configurable wait condition | OwnerOnly |
-| `snapshot` | Get page content as plain text (body innerText) | OwnerOnly |
-| `screenshot` | Take PNG screenshot, returned as base64 data URI | OwnerOnly |
-| `click` | Click element by CSS selector | OwnerOnly |
-| `type` | Fill form field by CSS selector | OwnerOnly |
-| `evaluate` | Execute JavaScript and return JSON result | OwnerOnly |
-| `tabs` | List all open tabs with titles and URLs | OwnerOnly |
-| `close` | Close browser and end session | OwnerOnly |
+| `navigate` | Open a URL; browser starts automatically on first use (`headed` opt-in) | OwnerOnly |
+| `snapshot` | Accessibility tree with element refs (`e0`, `e1`, ...); `interactive` or `full` filter | OwnerOnly |
+| `click` | Click element by ref | OwnerOnly |
+| `type` | Fill form field by ref | OwnerOnly |
+| `press` | Press a keyboard key, optionally on an element | OwnerOnly |
+| `scroll` | Scroll the page up or down | OwnerOnly |
+| `screenshot` | PNG screenshot as base64 data URI | OwnerOnly |
+| `eval` | Execute JavaScript, return JSON result | OwnerOnly |
+| `tabs` | List open tabs | OwnerOnly |
 
-Sessions are managed per-agent by `BrowserSessionManager` (singleton). Only available in the `full` tool profile. See [BROWSER](BROWSER.md) for setup.
+Powered by the PinchTab sidecar (`PINCHTAB_ENABLED=true`). Each agent has its own browser profile (`agent-{agentId}`); instances start lazily and close at conversation turn end. See [BROWSER](BROWSER.md) for setup.
 
 ## Tool Notifications
 
