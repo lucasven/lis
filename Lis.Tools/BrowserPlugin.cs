@@ -14,6 +14,7 @@ namespace Lis.Tools;
 /// </summary>
 public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabClient client) {
 
+	[Trace("BrowserPlugin > NavigateAsync")]
 	[KernelFunction("navigate")]
 	[Description("Open a URL in the agent's browser. Starts the browser automatically on first use. Use headed=true to show a visible browser window (only works when a display is available).")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -44,6 +45,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > SnapshotAsync")]
 	[KernelFunction("snapshot")]
 	[Description("Read the current page as an accessibility tree with element refs (e0, e1, ...). Refs are used by browser-click, browser-type, and browser-press. Filter 'interactive' returns only actionable elements; 'full' returns all text content.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
@@ -61,6 +63,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > ClickAsync")]
 	[KernelFunction("click")]
 	[Description("Click an element by its ref from browser-snapshot (e.g. 'e5').")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -79,6 +82,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > TypeAsync")]
 	[KernelFunction("type")]
 	[Description("Fill a form field by its ref from browser-snapshot. Replaces existing content.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -98,6 +102,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > PressAsync")]
 	[KernelFunction("press")]
 	[Description("Press a keyboard key (e.g. 'Enter', 'Tab', 'Escape'), optionally on a specific element.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -118,6 +123,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > ScrollAsync")]
 	[KernelFunction("scroll")]
 	[Description("Scroll the page up or down.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -136,6 +142,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > ScreenshotAsync")]
 	[KernelFunction("screenshot")]
 	[Description("Take a visual screenshot of the current page. Use browser-snapshot for text content instead — screenshots cost more tokens.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
@@ -152,6 +159,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > EvalAsync")]
 	[KernelFunction("eval")]
 	[Description("Execute JavaScript in the page context and return the result. Useful for extracting data or interacting with page APIs.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
@@ -171,6 +179,7 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > TabsAsync")]
 	[KernelFunction("tabs")]
 	[Description("List all open browser tabs with their titles and URLs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
