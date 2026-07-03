@@ -2,7 +2,7 @@ using Lis.Agent.Commands;
 using Lis.Core.A2A;
 using Lis.Core.Subagents;
 using Lis.Tools;
-using Lis.Tools.Browser;
+using Lis.Tools.Pinchtab;
 
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +36,8 @@ public static class AgentSetup {
 			kernel.Plugins.AddFromType<ExecPlugin>(pluginName: "exec", serviceProvider: sp);
 			kernel.Plugins.AddFromType<FileSystemPlugin>(pluginName: "fs", serviceProvider: sp);
 			kernel.Plugins.AddFromType<WebPlugin>(pluginName: "web", serviceProvider: sp);
-			kernel.Plugins.AddFromType<BrowserPlugin>(pluginName: "browser", serviceProvider: sp);
+			if (sp.GetRequiredService<PinchtabOptions>().Enabled)
+				kernel.Plugins.AddFromType<BrowserPlugin>(pluginName: "browser", serviceProvider: sp);
 			kernel.Plugins.AddFromType<CronPlugin>(pluginName: "cron", serviceProvider: sp);
 			kernel.Plugins.AddFromType<A2aPlugin>(pluginName: "a2a", serviceProvider: sp);
 			kernel.Plugins.AddFromType<SkillPlugin>(pluginName: "skill", serviceProvider: sp);
@@ -60,7 +61,14 @@ public static class AgentSetup {
 		services.AddSingleton<ToolAuthRegistry>();
 		services.AddSingleton<ToolPolicyService>();
 		services.AddSingleton<IApprovalService, ApprovalService>();
-		services.AddSingleton<BrowserSessionManager>();
+		// Browser (PinchTab sidecar)
+		PinchtabOptions pinchtabOptions = PinchtabOptions.FromEnvironment();
+		services.AddSingleton(pinchtabOptions);
+		services.AddSingleton<PinchtabServerState>();
+		services.AddSingleton<PinchtabBinaryProvisioner>();
+		services.AddSingleton<IPinchtabClient, PinchtabClient>();
+		services.AddSingleton<PinchtabInstanceManager>();
+		if (pinchtabOptions.Enabled) services.AddHostedService<PinchtabProcessManager>();
 
 		// Error suppression + OAuth
 		services.AddSingleton<ErrorSuppressionService>();

@@ -1,82 +1,59 @@
 using System.ComponentModel;
-using System.Text;
-using System.Text.Json;
 
 using Lis.Core.Util;
-using Lis.Tools.Browser;
+using Lis.Tools.Pinchtab;
 
-using Microsoft.Playwright;
 using Microsoft.SemanticKernel;
 
 namespace Lis.Tools;
 
-public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
-
-	[KernelFunction("start")]
-	[Description("Launch a headless Chrome browser session. Optionally navigate to a URL immediately. Must be called before any other browser tool. Only one session at a time.")]
-	[ToolSummarization(SummarizationPolicy.Prune)]
-	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
-	public async Task<string> StartAsync(
-		[Description("URL to navigate to after launch (optional)")] string? url = null,
-		[Description("Run in headless mode (default: true)")] bool headless = true,
-		CancellationToken ct = default) {
-		await ToolContext.NotifyAsync("🌐 Starting browser", ct);
-
-		try {
-			long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
-			await sessionManager.GetOrStartAsync(agentId, url, headless, ct);
-
-			return string.IsNullOrWhiteSpace(url)
-				? "Browser started."
-				: $"Browser started at {url}";
-		} catch (PlaywrightException) {
-			return "Browser failed to start: Playwright browsers are not installed. "
-				+ "Fix this by running: pwsh playwright.ps1 install chromium "
-				+ "from the build output directory (e.g. Lis.Api/bin/Debug/net10.0/) "
-				+ "using exec_run_command, then retry browser_start.";
-		} catch (Exception ex) {
-			return $"Error starting browser: {ex.Message}";
-		}
-	}
+/// <summary>
+/// Browser automation via the PinchTab sidecar. Each agent gets its own browser
+/// instance (profile "agent-{agentId}"), lazily started on first navigate and
+/// closed automatically when the conversation turn ends.
+/// </summary>
+public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabClient client) {
 
 	[KernelFunction("navigate")]
-	[Description("Navigate the browser to a URL.")]
+	[Description("Open a URL in the agent's browser. Starts the browser automatically on first use. Use headed=true to show a visible browser window (only works when a display is available).")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> NavigateAsync(
 		[Description("URL to navigate to")] string url,
-		[Description("Wait condition: load, domcontentloaded, or networkidle")] string? waitUntil = null) {
+		[Description("Show a visible browser window (default: false, headless)")] bool headed = false,
+		CancellationToken ct = default) {
+		await ToolContext.NotifyAsync($"🌐 Opening: {url}", ct);
+
+		if (headed && !DisplayProbe.IsAvailable())
+			return "Headed mode is not available: no display detected on this system (e.g. running in Docker). Retry with headed=false.";
+
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
+			long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+			AgentBrowserSession session = await instances.EnsureSessionAsync(agentId, headed, ct);
 
-			await page.GotoAsync(url, new PageGotoOptions {
-				WaitUntil = ParseWaitUntil(waitUntil),
-			});
+			if (session.TabId is null) {
+				PinchtabTab tab = await client.OpenTabAsync(session.InstanceId, url, ct);
+				session.TabId = tab.TabId;
+				return $"Navigated to {url} (title: {tab.Title}). Use browser-snapshot to read the page.";
+			}
 
-			string title = await page.TitleAsync();
-			return $"Navigated to {url} (title: {title})";
-		} catch (InvalidOperationException ex) {
-			return ex.Message;
+			await client.NavigateAsync(session.TabId, url, ct);
+			return $"Navigated to {url}. Use browser-snapshot to read the page.";
 		} catch (Exception ex) {
 			return $"Navigation error: {ex.Message}";
 		}
 	}
 
 	[KernelFunction("snapshot")]
-	[Description("Get the current page's DOM as accessible plain text (aria tree). Cheaper than screenshot for reading text content. Includes element selectors for use with browser-click and browser-type.")]
+	[Description("Read the current page as an accessibility tree with element refs (e0, e1, ...). Refs are used by browser-click, browser-type, and browser-press. Filter 'interactive' returns only actionable elements; 'full' returns all text content.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> SnapshotAsync(
-		[Description("Maximum character length of the returned text")] int maxLength = 15000) {
+		[Description("Filter: 'interactive' (default, actionable elements only) or 'full' (all content)")] string filter = "interactive",
+		CancellationToken ct = default) {
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			string text = await page.InnerTextAsync("body");
-
-			if (text.Length > maxLength)
-				text = text[..maxLength] + " [...truncated]";
-
-			return text;
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			return await client.SnapshotAsync(tabId, filter == "full" ? "none" : "interactive", maxTokens: 4000, ct);
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
 		} catch (Exception ex) {
@@ -84,40 +61,17 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 		}
 	}
 
-	[KernelFunction("screenshot")]
-	[Description("Take a visual screenshot of the current page. Use browser-snapshot for text content instead — screenshots cost more tokens.")]
-	[ToolSummarization(SummarizationPolicy.Prune)]
-	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
-	public async Task<string> ScreenshotAsync(
-		[Description("Capture the full scrollable page (default: false)")] bool fullPage = false) {
-		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			byte[] bytes = await page.ScreenshotAsync(new PageScreenshotOptions {
-				FullPage = fullPage,
-				Type = ScreenshotType.Png,
-			});
-
-			return $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
-		} catch (InvalidOperationException ex) {
-			return ex.Message;
-		} catch (Exception ex) {
-			return $"Screenshot error: {ex.Message}";
-		}
-	}
-
 	[KernelFunction("click")]
-	[Description("Click an element by CSS selector. Use browser-snapshot first to find available selectors on the page.")]
+	[Description("Click an element by its ref from browser-snapshot (e.g. 'e5').")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> ClickAsync(
-		[Description("CSS selector of the element to click")] string selector) {
+		[Description("Element ref from browser-snapshot (e.g. 'e5')")] string @ref,
+		CancellationToken ct = default) {
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			await page.ClickAsync(selector);
-
-			return $"Clicked: {selector}";
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			await client.ActionAsync(tabId, new { kind = "click", @ref }, ct);
+			return $"Clicked {@ref}. Page may have changed — use browser-snapshot to see the result.";
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
 		} catch (Exception ex) {
@@ -126,18 +80,17 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	}
 
 	[KernelFunction("type")]
-	[Description("Type text into a form field by CSS selector. Use browser-snapshot to find input selectors. The field is focused before typing.")]
+	[Description("Fill a form field by its ref from browser-snapshot. Replaces existing content.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
 	public async Task<string> TypeAsync(
-		[Description("CSS selector of the input element")] string selector,
-		[Description("Text to type into the element")] string text) {
+		[Description("Element ref from browser-snapshot (e.g. 'e3')")] string @ref,
+		[Description("Text to fill into the field")] string text,
+		CancellationToken ct = default) {
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			await page.FillAsync(selector, text);
-
-			return $"Typed into: {selector}";
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			await client.ActionAsync(tabId, new { kind = "fill", @ref, value = text }, ct);
+			return $"Typed into {@ref}.";
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
 		} catch (Exception ex) {
@@ -145,20 +98,72 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 		}
 	}
 
-	[KernelFunction("evaluate")]
-	[Description("Execute JavaScript in the browser page context and return the result as a string. Useful for extracting data, manipulating the DOM, or interacting with page APIs.")]
+	[KernelFunction("press")]
+	[Description("Press a keyboard key (e.g. 'Enter', 'Tab', 'Escape'), optionally on a specific element.")]
+	[ToolSummarization(SummarizationPolicy.Prune)]
+	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
+	public async Task<string> PressAsync(
+		[Description("Key to press (e.g. 'Enter', 'Tab', 'Escape', 'ArrowDown')")] string key,
+		[Description("Element ref to focus first (optional)")] string? @ref = null,
+		CancellationToken ct = default) {
+		try {
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			object payload = @ref is null ? new { kind = "press", key } : new { kind = "press", key, @ref };
+			await client.ActionAsync(tabId, payload, ct);
+			return $"Pressed {key}.";
+		} catch (InvalidOperationException ex) {
+			return ex.Message;
+		} catch (Exception ex) {
+			return $"Press error: {ex.Message}";
+		}
+	}
+
+	[KernelFunction("scroll")]
+	[Description("Scroll the page up or down.")]
+	[ToolSummarization(SummarizationPolicy.Prune)]
+	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
+	public async Task<string> ScrollAsync(
+		[Description("Direction: 'down' or 'up'")] string direction = "down",
+		CancellationToken ct = default) {
+		try {
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			await client.ActionAsync(tabId, new { kind = "scroll", direction }, ct);
+			return $"Scrolled {direction}.";
+		} catch (InvalidOperationException ex) {
+			return ex.Message;
+		} catch (Exception ex) {
+			return $"Scroll error: {ex.Message}";
+		}
+	}
+
+	[KernelFunction("screenshot")]
+	[Description("Take a visual screenshot of the current page. Use browser-snapshot for text content instead — screenshots cost more tokens.")]
+	[ToolSummarization(SummarizationPolicy.Prune)]
+	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
+	public async Task<string> ScreenshotAsync(CancellationToken ct = default) {
+		try {
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			byte[] bytes = await client.ScreenshotAsync(tabId, ct);
+			return $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
+		} catch (InvalidOperationException ex) {
+			return ex.Message;
+		} catch (Exception ex) {
+			return $"Screenshot error: {ex.Message}";
+		}
+	}
+
+	[KernelFunction("eval")]
+	[Description("Execute JavaScript in the page context and return the result. Useful for extracting data or interacting with page APIs.")]
 	[ToolSummarization(SummarizationPolicy.Summarize)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
-	public async Task<string> EvaluateAsync(
-		[Description("JavaScript code to execute")] string script) {
-		await ToolContext.NotifyAsync("🔧 Evaluating JS");
+	public async Task<string> EvalAsync(
+		[Description("JavaScript expression to execute")] string code,
+		CancellationToken ct = default) {
+		await ToolContext.NotifyAsync("🔧 Evaluating JS", ct);
 
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			JsonElement result = await page.EvaluateAsync<JsonElement>(script);
-
-			return JsonSerializer.Serialize(result);
+			(_, string tabId) = await this.GetTabOrThrowAsync();
+			return await client.EvaluateAsync(tabId, code, ct);
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
 		} catch (Exception ex) {
@@ -170,20 +175,10 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 	[Description("List all open browser tabs with their titles and URLs.")]
 	[ToolSummarization(SummarizationPolicy.Prune)]
 	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
-	public async Task<string> TabsAsync() {
+	public async Task<string> TabsAsync(CancellationToken ct = default) {
 		try {
-			IPage page = await this.GetPageOrThrowAsync();
-
-			IReadOnlyList<IPage> pages = page.Context.Pages;
-			StringBuilder sb = new();
-
-			foreach (IPage p in pages) {
-				string title = await p.TitleAsync();
-				sb.AppendLine($"- {title} ({p.Url})");
-			}
-
-			string output = sb.ToString().TrimEnd();
-			return output.Length > 0 ? output : "No tabs open.";
+			(AgentBrowserSession session, _) = await this.GetTabOrThrowAsync();
+			return await client.ListTabsAsync(session.InstanceId, ct);
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
 		} catch (Exception ex) {
@@ -191,33 +186,13 @@ public sealed class BrowserPlugin(BrowserSessionManager sessionManager) {
 		}
 	}
 
-	[KernelFunction("close")]
-	[Description("Close the browser and end the session. Call when done with browser tasks to free resources.")]
-	[ToolSummarization(SummarizationPolicy.Prune)]
-	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
-	public async Task<string> CloseAsync() {
-		try {
-			long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
-			await sessionManager.CloseAsync(agentId);
-
-			return "Browser closed.";
-		} catch (Exception ex) {
-			return $"Error closing browser: {ex.Message}";
-		}
-	}
-
-	private async Task<IPage> GetPageOrThrowAsync() {
+	private Task<(AgentBrowserSession Session, string TabId)> GetTabOrThrowAsync() {
 		long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
-		return await sessionManager.GetPageAsync(agentId)
-			?? throw new InvalidOperationException("No browser session. Call browser_start first.");
-	}
 
-	private static WaitUntilState? ParseWaitUntil(string? waitUntil) {
-		return waitUntil?.ToLowerInvariant() switch {
-			"load" => WaitUntilState.Load,
-			"domcontentloaded" => WaitUntilState.DOMContentLoaded,
-			"networkidle" => WaitUntilState.NetworkIdle,
-			_ => null,
-		};
+		AgentBrowserSession? session = instances.GetSession(agentId);
+		if (session?.TabId is null)
+			throw new InvalidOperationException("No page open. Use browser-navigate first.");
+
+		return Task.FromResult((session, session.TabId));
 	}
 }
