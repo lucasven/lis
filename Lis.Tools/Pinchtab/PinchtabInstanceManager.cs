@@ -87,6 +87,9 @@ public sealed partial class PinchtabInstanceManager(
 
 			// Log what pinchtab acknowledged (not what we requested) to catch mode/browser fallbacks
 			LogInstanceEcho(logger, instance.Id, instance.Mode, instance.Browser, instance.FallbackFrom, instance.FallbackReason);
+			string requestedMode = headed ? "headed" : "headless";
+			if (instance.Mode is not null && instance.Mode != requestedMode)
+				LogModeMismatch(logger, instance.Id, requestedMode, instance.Mode);
 			if (headed) await this.RelayInstanceLogsAsync(instance.Id, ct);
 
 			AgentBrowserSession session = new() { InstanceId = instance.Id, Headed = headed };
@@ -162,6 +165,9 @@ public sealed partial class PinchtabInstanceManager(
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Pinchtab instance {InstanceId} echo: mode={Mode}, browser={Browser}, fallbackFrom={FallbackFrom}, fallbackReason={FallbackReason}")]
 	private static partial void LogInstanceEcho(ILogger logger, string instanceId, string? mode, string? browser, string? fallbackFrom, string? fallbackReason);
+
+	[LoggerMessage(Level = LogLevel.Warning, Message = "Pinchtab instance {InstanceId} mode mismatch: requested {Requested} but pinchtab acknowledged {Acknowledged}")]
+	private static partial void LogModeMismatch(ILogger logger, string instanceId, string requested, string acknowledged);
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Pinchtab instance {InstanceId} bridge logs:\n{Logs}")]
 	private static partial void LogInstanceLogs(ILogger logger, string instanceId, string logs);
