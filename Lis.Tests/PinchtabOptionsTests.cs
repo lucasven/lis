@@ -12,6 +12,7 @@ public class PinchtabOptionsTests {
 		Environment.SetEnvironmentVariable("PINCHTAB_DATA_DIR", null);
 		Environment.SetEnvironmentVariable("PINCHTAB_CHROME_PATH", null);
 		Environment.SetEnvironmentVariable("PINCHTAB_RESTART_HOUR", null);
+		Environment.SetEnvironmentVariable("PINCHTAB_HANDOFF_TIMEOUT_MINUTES", null);
 
 		PinchtabOptions options = PinchtabOptions.FromEnvironment();
 
@@ -21,6 +22,7 @@ public class PinchtabOptionsTests {
 		Assert.Equal("./data/pinchtab", options.DataDir);
 		Assert.Null(options.ChromePath);
 		Assert.Equal(4, options.RestartHour);
+		Assert.Equal(15, options.HandoffTimeoutMinutes);
 		Assert.Equal("http://localhost:9867", options.BaseUrl);
 	}
 
@@ -32,6 +34,7 @@ public class PinchtabOptionsTests {
 		Environment.SetEnvironmentVariable("PINCHTAB_DATA_DIR", "/opt/pinchtab");
 		Environment.SetEnvironmentVariable("PINCHTAB_CHROME_PATH", "/usr/bin/chromium");
 		Environment.SetEnvironmentVariable("PINCHTAB_RESTART_HOUR", "2");
+		Environment.SetEnvironmentVariable("PINCHTAB_HANDOFF_TIMEOUT_MINUTES", "30");
 
 		PinchtabOptions options = PinchtabOptions.FromEnvironment();
 
@@ -41,6 +44,7 @@ public class PinchtabOptionsTests {
 		Assert.Equal("/opt/pinchtab", options.DataDir);
 		Assert.Equal("/usr/bin/chromium", options.ChromePath);
 		Assert.Equal(2, options.RestartHour);
+		Assert.Equal(30, options.HandoffTimeoutMinutes);
 		Assert.Equal("http://localhost:9900", options.BaseUrl);
 
 		Environment.SetEnvironmentVariable("PINCHTAB_ENABLED", null);
@@ -49,6 +53,7 @@ public class PinchtabOptionsTests {
 		Environment.SetEnvironmentVariable("PINCHTAB_DATA_DIR", null);
 		Environment.SetEnvironmentVariable("PINCHTAB_CHROME_PATH", null);
 		Environment.SetEnvironmentVariable("PINCHTAB_RESTART_HOUR", null);
+		Environment.SetEnvironmentVariable("PINCHTAB_HANDOFF_TIMEOUT_MINUTES", null);
 	}
 
 	[Fact]
