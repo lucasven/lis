@@ -121,7 +121,8 @@ public sealed partial class PinchtabProcessManager(
 	private async Task StopProcessAsync() {
 		Process? proc = this.process;
 		this.process = null;
-		if (proc is null || proc.HasExited) return;
+		if (proc is null) return;
+		if (proc.HasExited) { proc.Dispose(); return; }
 
 		// Graceful shutdown first, then kill the process tree
 		try {

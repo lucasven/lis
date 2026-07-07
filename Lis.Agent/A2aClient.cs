@@ -131,6 +131,7 @@ public sealed partial class A2aClient(
 			string?     lastAssistantContent = null;
 			TokenUsage? lastUsage            = null;
 
+			pinchtabInstances.BeginTurn(agent.Id);
 			try {
 				await foreach (ChatMessageContent msg in toolRunner.RunAsync(
 					chatService, history, agentKernel, settings, usageExtractor, ct)) {
@@ -165,7 +166,8 @@ public sealed partial class A2aClient(
 				}
 			} finally {
 				// Close the target agent's pinchtab browser instance at the end of the A2A call
-				try { await pinchtabInstances.CloseForAgentAsync(agent.Id); }
+				// (reference-counted: only closes when no other turn for this agent is running)
+				try { await pinchtabInstances.EndTurnAsync(agent.Id); }
 				catch (Exception ex) { LogPinchtabCloseFailed(logger, ex, agent.Id); }
 			}
 

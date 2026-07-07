@@ -150,4 +150,60 @@ public class PinchtabInstanceManagerTests {
 
 		Assert.Empty(client.StoppedInstances);
 	}
+
+	[Fact]
+	public async Task EndTurn_keeps_instance_alive_while_another_turn_is_running() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(3);
+		manager.BeginTurn(3);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(3, headed: false, CancellationToken.None);
+
+		await manager.EndTurnAsync(3);
+
+		Assert.Empty(client.StoppedInstances);
+		Assert.Same(session, manager.GetSession(3));
+	}
+
+	[Fact]
+	public async Task EndTurn_closes_instance_when_last_turn_finishes() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(3);
+		manager.BeginTurn(3);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(3, headed: false, CancellationToken.None);
+
+		await manager.EndTurnAsync(3);
+		await manager.EndTurnAsync(3);
+
+		Assert.Contains(session.InstanceId, client.StoppedInstances);
+		Assert.Null(manager.GetSession(3));
+	}
+
+	[Fact]
+	public async Task Close_is_skipped_when_a_new_turn_started_meanwhile() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		AgentBrowserSession session = await manager.EnsureSessionAsync(3, headed: false, CancellationToken.None);
+		manager.BeginTurn(3);
+
+		await manager.CloseForAgentAsync(3);
+
+		Assert.Empty(client.StoppedInstances);
+		Assert.Same(session, manager.GetSession(3));
+	}
+
+	[Fact]
+	public async Task EndTurn_without_session_is_noop() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(42);
+		await manager.EndTurnAsync(42);
+
+		Assert.Empty(client.StoppedInstances);
+	}
 }

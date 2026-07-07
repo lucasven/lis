@@ -292,6 +292,7 @@ public sealed partial class ConversationService(
 		bool        sentAnyMessage    = false;
 		string?     lastAssistantText = null;
 
+		pinchtabInstances.BeginTurn(agent.Id);
 		try {
 			opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider, chatHistory);
 			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
@@ -368,7 +369,8 @@ public sealed partial class ConversationService(
 			throw;
 		} finally {
 			// Close the agent's pinchtab browser instance at the end of the conversation turn
-			try { await pinchtabInstances.CloseForAgentAsync(agent.Id); }
+			// (reference-counted: only closes when no other turn for this agent is running)
+			try { await pinchtabInstances.EndTurnAsync(agent.Id); }
 			catch (Exception ex) { logger.LogWarning(ex, "Failed to close pinchtab instance for agent {AgentId}", agent.Id); }
 		}
 

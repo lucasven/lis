@@ -22,9 +22,31 @@ public sealed partial class PinchtabInstanceManager(
 	ILogger<PinchtabInstanceManager> logger) : IDisposable {
 
 	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions = new();
+	private readonly Dictionary<long, int> activeTurns = new();
 	private readonly SemaphoreSlim gate = new(1, 1);
+	private readonly Lock turnLock = new();
 
 	public void Dispose() => this.gate.Dispose();
+
+	/// <summary>Marks the start of a conversation turn for an agent. Pair with <see cref="EndTurnAsync"/>.</summary>
+	public void BeginTurn(long agentId) {
+		lock (this.turnLock) this.activeTurns[agentId] = this.activeTurns.GetValueOrDefault(agentId) + 1;
+	}
+
+	/// <summary>
+	/// Marks the end of a conversation turn. Closes the agent's browser instance only when
+	/// no other turn for the same agent is still running (turns are reference-counted).
+	/// </summary>
+	[Trace("PinchtabInstanceManager > EndTurnAsync")]
+	public async Task EndTurnAsync(long agentId) {
+		lock (this.turnLock) {
+			int remaining = this.activeTurns.GetValueOrDefault(agentId) - 1;
+			if (remaining > 0) { this.activeTurns[agentId] = remaining; return; }
+			this.activeTurns.Remove(agentId);
+		}
+
+		await this.CloseForAgentAsync(agentId);
+	}
 
 	[Trace("PinchtabInstanceManager > EnsureSessionAsync")]
 	public async Task<AgentBrowserSession> EnsureSessionAsync(long agentId, bool headed, CancellationToken ct) {
@@ -67,6 +89,9 @@ public sealed partial class PinchtabInstanceManager(
 	public async Task CloseForAgentAsync(long agentId) {
 		await this.gate.WaitAsync();
 		try {
+			// A new turn may have started while we waited for the gate; keep the instance alive
+			lock (this.turnLock) { if (this.activeTurns.GetValueOrDefault(agentId) > 0) return; }
+
 			if (!this.sessions.TryRemove(agentId, out AgentBrowserSession? session)) return;
 
 			try {
