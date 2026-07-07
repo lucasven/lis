@@ -8,6 +8,7 @@ Lis drives Chrome through [PinchTab](https://pinchtab.com) — a single Go binar
 - The sidecar is supervised: restarted on crash (exponential backoff) and restarted daily at `PINCHTAB_RESTART_HOUR`.
 - Each agent gets a persistent browser profile named `agent-{agentId}`. A browser instance starts lazily on the agent's first `browser-navigate` and stops when the conversation turn ends. Profile state (cookies, logins) persists on disk.
 - Headless by default. `browser-navigate(headed=true)` opens a visible window when a display is available; in Docker it returns a graceful "not available" message.
+- `browser-handoff` keeps a headed instance alive past turn end so the user can log in / solve a captcha with the agent's cookies. The agent reclaims it on the user's next message; an idle timeout (`PINCHTAB_HANDOFF_TIMEOUT_MINUTES`) closes it otherwise.
 
 ## Configuration
 
@@ -19,6 +20,7 @@ Lis drives Chrome through [PinchTab](https://pinchtab.com) — a single Go binar
 | `PINCHTAB_DATA_DIR` | `./data/pinchtab` | Binary, config, profiles, and state |
 | `PINCHTAB_CHROME_PATH` | (auto-detect) | Chrome/Chromium binary path |
 | `PINCHTAB_RESTART_HOUR` | `4` | Local hour for the daily scheduled restart |
+| `PINCHTAB_HANDOFF_TIMEOUT_MINUTES` | `15` | Idle minutes before a handed-off headed instance is closed |
 | `PINCHTAB_TOKEN` | (generated) | API auth token; random per boot when empty |
 
 ## Bare metal

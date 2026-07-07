@@ -197,6 +197,22 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		}
 	}
 
+	[Trace("BrowserPlugin > HandoffAsync")]
+	[KernelFunction("handoff")]
+	[Description("Hand the browser to the user for manual interaction (login, captcha, 2FA). Requires a headed session (browser-navigate with headed=true). The window stays open after your reply; the user's next message returns control to you.")]
+	[ToolSummarization(SummarizationPolicy.Prune)]
+	[ToolAuthorization(ToolAuthLevel.OwnerOnly)]
+	public async Task<string> HandoffAsync(CancellationToken ct = default) {
+		await ToolContext.NotifyAsync("🤝 Handing browser to you", ct);
+
+		try {
+			long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
+			return instances.MarkHandoff(agentId);
+		} catch (Exception ex) {
+			return $"Handoff error: {ex.Message}";
+		}
+	}
+
 	private Task<(AgentBrowserSession Session, string TabId)> GetTabOrThrowAsync() {
 		long agentId = ToolContext.AgentId ?? throw new InvalidOperationException("No agent context");
 

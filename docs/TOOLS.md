@@ -116,8 +116,9 @@ Requires `LIS_WEB_SEARCH_ENABLED=true` and `LIS_WEB_SEARCH_API_KEY`. To read pag
 | `screenshot` | PNG screenshot as base64 data URI | OwnerOnly |
 | `eval` | Execute JavaScript, return JSON result | OwnerOnly |
 | `tabs` | List open tabs | OwnerOnly |
+| `handoff` | Hand the headed browser to the user (login/captcha/2FA); survives turn end until the next message or timeout | OwnerOnly |
 
-Powered by the PinchTab sidecar (`PINCHTAB_ENABLED=true`). Each agent has its own browser profile (`agent-{agentId}`); instances start lazily and close at conversation turn end. See [BROWSER](BROWSER.md) for setup.
+Powered by the PinchTab sidecar (`PINCHTAB_ENABLED=true`). Each agent has its own browser profile (`agent-{agentId}`); instances start lazily and close at conversation turn end — unless handed off via `handoff`, in which case the instance survives until the user's next message or `PINCHTAB_HANDOFF_TIMEOUT_MINUTES`. See [BROWSER](BROWSER.md) for setup.
 
 ## Tool Notifications
 
