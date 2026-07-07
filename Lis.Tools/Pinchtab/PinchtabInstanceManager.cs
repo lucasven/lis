@@ -23,8 +23,8 @@ public sealed partial class PinchtabInstanceManager(
 	PinchtabOptions                  options,
 	ILogger<PinchtabInstanceManager> logger) : IDisposable {
 
-	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions     = new();
-	private readonly Dictionary<long, int>                           activeTurns  = new();
+	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions      = new();
+	private readonly Dictionary<long, int>                           activeTurns   = new();
 	private readonly Dictionary<long, CancellationTokenSource>       handoffTimers = new();
 	private readonly SemaphoreSlim gate     = new(1, 1);
 	private readonly Lock          turnLock = new();
@@ -53,6 +53,10 @@ public sealed partial class PinchtabInstanceManager(
 				cts.Cancel();
 				cts.Dispose();
 			}
+
+			// Only a turn starting with no other turn active reclaims a handoff; a concurrent
+			// turn during the handoff-marking turn must not wipe the flag
+			if (this.activeTurns[agentId] != 1) return;
 		}
 
 		if (this.sessions.TryGetValue(agentId, out AgentBrowserSession? session) && session.HandedOff) {
@@ -174,7 +178,11 @@ public sealed partial class PinchtabInstanceManager(
 
 		if (this.sessions.TryGetValue(agentId, out AgentBrowserSession? session)) session.HandedOff = false;
 		LogHandoffExpired(logger, agentId);
-		await this.CloseForAgentAsync(agentId);
+		try {
+			await this.CloseForAgentAsync(agentId);
+		} catch (Exception ex) {
+			LogHandoffCloseFailed(logger, ex, agentId);
+		}
 	}
 
 	[Trace("PinchtabInstanceManager > CloseForAgentAsync")]
@@ -278,4 +286,7 @@ public sealed partial class PinchtabInstanceManager(
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Browser handoff for agent {AgentId} timed out; closing instance")]
 	private static partial void LogHandoffExpired(ILogger logger, long agentId);
+
+	[LoggerMessage(Level = LogLevel.Warning, Message = "Failed to close browser instance after handoff timeout for agent {AgentId}")]
+	private static partial void LogHandoffCloseFailed(ILogger logger, Exception ex, long agentId);
 }

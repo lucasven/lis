@@ -2,7 +2,7 @@ namespace Lis.Tools.Pinchtab;
 
 /// <summary>Configuration for the PinchTab sidecar, read from flat env vars.</summary>
 public sealed class PinchtabOptions {
-	public bool    Enabled                { get; init; }
+	public bool    Enabled               { get; init; }
 	public int     Port                  { get; init; } = 9867;
 	public string  Version               { get; init; } = "v0.14.0";
 	public string  DataDir               { get; init; } = "./data/pinchtab";

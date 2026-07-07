@@ -300,4 +300,21 @@ public class PinchtabInstanceManagerTests {
 		Assert.Empty(client.StoppedInstances);
 		Assert.NotNull(manager.GetSession(7));
 	}
+
+	[Fact]
+	public async Task Concurrent_turn_does_not_cancel_fresh_handoff() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(7);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(7, headed: true, CancellationToken.None);
+		manager.MarkHandoff(7);
+		manager.BeginTurn(7);          // concurrent A2A turn while the handoff turn is still running
+		await manager.EndTurnAsync(7);
+		await manager.EndTurnAsync(7); // last turn out — handoff must persist
+
+		Assert.Empty(client.StoppedInstances);
+		Assert.True(manager.GetSession(7)!.HandedOff);
+		Assert.Equal(session.InstanceId, manager.GetSession(7)!.InstanceId);
+	}
 }
