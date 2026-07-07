@@ -282,6 +282,7 @@ public sealed class A2aClientTests : IDisposable {
 		public Task                    StopProfileAsync(string profileId, CancellationToken ct = default)                  => Task.CompletedTask;
 		public Task<PinchtabInstance>  StartInstanceAsync(string profileId, bool headed, CancellationToken ct = default)   => Task.FromResult(new PinchtabInstance("i1", profileId, "9999", "running"));
 		public Task<PinchtabInstance?> GetInstanceAsync(string instanceId, CancellationToken ct = default)                 => Task.FromResult<PinchtabInstance?>(null);
+		public Task<string>            GetInstanceLogsAsync(string instanceId, CancellationToken ct = default)            => Task.FromResult("");
 		public Task                    StopInstanceAsync(string instanceId, CancellationToken ct = default)                => Task.CompletedTask;
 		public Task<PinchtabTab>       OpenTabAsync(string instanceId, string url, CancellationToken ct = default)         => Task.FromResult(new PinchtabTab("t1", url, "Title"));
 		public Task<string>            ListTabsAsync(string instanceId, CancellationToken ct = default)                    => Task.FromResult("[]");

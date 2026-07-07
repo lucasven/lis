@@ -40,6 +40,8 @@ public class PinchtabInstanceManagerTests {
 				? (PinchtabInstance?)null
 				: new PinchtabInstance(instanceId, null, "9999", "running"));
 
+		public Task<string> GetInstanceLogsAsync(string instanceId, CancellationToken ct = default) => Task.FromResult("");
+
 		public Task StopInstanceAsync(string instanceId, CancellationToken ct = default) {
 			this.StoppedInstances.Add(instanceId);
 			return Task.CompletedTask;

@@ -78,7 +78,16 @@ public sealed partial class PinchtabInstanceManager(
 			try { await client.StopProfileAsync(profileId, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { }
 
 			PinchtabInstance instance = await client.StartInstanceAsync(profileId, headed, ct);
-			instance = await this.WaitRunningAsync(instance, ct);
+			try {
+				instance = await this.WaitRunningAsync(instance, ct);
+			} catch (InvalidOperationException) {
+				await this.RelayInstanceLogsAsync(instance.Id, ct);
+				throw;
+			}
+
+			// Log what pinchtab acknowledged (not what we requested) to catch mode/browser fallbacks
+			LogInstanceEcho(logger, instance.Id, instance.Mode, instance.Browser, instance.FallbackFrom, instance.FallbackReason);
+			if (headed) await this.RelayInstanceLogsAsync(instance.Id, ct);
 
 			AgentBrowserSession session = new() { InstanceId = instance.Id, Headed = headed };
 			this.sessions[agentId] = session;
@@ -121,6 +130,17 @@ public sealed partial class PinchtabInstanceManager(
 		return profile.Id;
 	}
 
+	/// <summary>Fetches the per-instance bridge ring buffer (chrome launch line, chrome stderr) into our logs.</summary>
+	private async Task RelayInstanceLogsAsync(string instanceId, CancellationToken ct) {
+		try {
+			string logs = await client.GetInstanceLogsAsync(instanceId, ct);
+			if (logs.Length > 8000) logs = logs[^8000..];
+			LogInstanceLogs(logger, instanceId, logs);
+		} catch (Exception ex) when (ex is not OperationCanceledException) {
+			LogInstanceLogsFailed(logger, ex, instanceId);
+		}
+	}
+
 	private async Task<PinchtabInstance> WaitRunningAsync(PinchtabInstance instance, CancellationToken ct) {
 		if (instance.Status == "running") return instance;
 
@@ -139,6 +159,15 @@ public sealed partial class PinchtabInstanceManager(
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Starting headed instance with DISPLAY={Display}, WAYLAND_DISPLAY={WaylandDisplay}, XAUTHORITY={Xauthority}")]
 	private static partial void LogHeadedDisplay(ILogger logger, string? display, string? waylandDisplay, string? xauthority);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Pinchtab instance {InstanceId} echo: mode={Mode}, browser={Browser}, fallbackFrom={FallbackFrom}, fallbackReason={FallbackReason}")]
+	private static partial void LogInstanceEcho(ILogger logger, string instanceId, string? mode, string? browser, string? fallbackFrom, string? fallbackReason);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Pinchtab instance {InstanceId} bridge logs:\n{Logs}")]
+	private static partial void LogInstanceLogs(ILogger logger, string instanceId, string logs);
+
+	[LoggerMessage(Level = LogLevel.Warning, Message = "Failed to fetch bridge logs for pinchtab instance {InstanceId}")]
+	private static partial void LogInstanceLogsFailed(ILogger logger, Exception ex, string instanceId);
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Started pinchtab instance {InstanceId} for agent {AgentId} (headed: {Headed})")]
 	private static partial void LogStarted(ILogger logger, long agentId, string instanceId, bool headed);

@@ -8,7 +8,16 @@ namespace Lis.Tools.Pinchtab;
 
 public sealed record PinchtabProfile(string Id, string Name);
 
-public sealed record PinchtabInstance(string Id, string? ProfileId, string? Port, string Status);
+public sealed record PinchtabInstance(
+	string  Id,
+	string? ProfileId,
+	string? Port,
+	string  Status,
+	string? Mode           = null,
+	string? Browser        = null,
+	string? Error          = null,
+	string? FallbackFrom   = null,
+	string? FallbackReason = null);
 
 public sealed record PinchtabTab(string TabId, string? Url, string? Title);
 
@@ -20,6 +29,7 @@ public interface IPinchtabClient {
 	Task StopProfileAsync(string profileId, CancellationToken ct = default);
 	Task<PinchtabInstance> StartInstanceAsync(string profileId, bool headed, CancellationToken ct = default);
 	Task<PinchtabInstance?> GetInstanceAsync(string instanceId, CancellationToken ct = default);
+	Task<string> GetInstanceLogsAsync(string instanceId, CancellationToken ct = default);
 	Task StopInstanceAsync(string instanceId, CancellationToken ct = default);
 	Task<PinchtabTab> OpenTabAsync(string instanceId, string url, CancellationToken ct = default);
 	Task<string> ListTabsAsync(string instanceId, CancellationToken ct = default);
@@ -103,6 +113,15 @@ public sealed class PinchtabClient(
 		if (!response.IsSuccessStatusCode) return null;
 
 		return await response.Content.ReadFromJsonAsync<PinchtabInstance>(Json, ct);
+	}
+
+	[Trace("PinchtabClient > GetInstanceLogsAsync")]
+	public async Task<string> GetInstanceLogsAsync(string instanceId, CancellationToken ct = default) {
+		using HttpClient client = this.CreateClient();
+		using HttpResponseMessage response = await client.GetAsync($"/instances/{instanceId}/logs", ct);
+		await EnsureSuccessAsync(response, ct);
+
+		return await response.Content.ReadAsStringAsync(ct);
 	}
 
 	[Trace("PinchtabClient > StopInstanceAsync")]
