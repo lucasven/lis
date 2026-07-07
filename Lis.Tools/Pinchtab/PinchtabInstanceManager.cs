@@ -11,6 +11,7 @@ public sealed class AgentBrowserSession {
 	public required string InstanceId { get; init; }
 	public required bool   Headed     { get; init; }
 	public string?         TabId      { get; set; }
+	public bool            HandedOff  { get; set; }
 }
 
 /// <summary>
@@ -19,18 +20,45 @@ public sealed class AgentBrowserSession {
 /// </summary>
 public sealed partial class PinchtabInstanceManager(
 	IPinchtabClient                  client,
+	PinchtabOptions                  options,
 	ILogger<PinchtabInstanceManager> logger) : IDisposable {
 
-	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions = new();
-	private readonly Dictionary<long, int> activeTurns = new();
-	private readonly SemaphoreSlim gate = new(1, 1);
-	private readonly Lock turnLock = new();
+	private readonly ConcurrentDictionary<long, AgentBrowserSession> sessions     = new();
+	private readonly Dictionary<long, int>                           activeTurns  = new();
+	private readonly Dictionary<long, CancellationTokenSource>       handoffTimers = new();
+	private readonly SemaphoreSlim gate     = new(1, 1);
+	private readonly Lock          turnLock = new();
 
-	public void Dispose() => this.gate.Dispose();
+	/// <summary>How long a handed-off instance survives without a new turn. Settable for tests.</summary>
+	public TimeSpan HandoffTimeout { get; set; } = TimeSpan.FromMinutes(options.HandoffTimeoutMinutes);
+
+	public void Dispose() {
+		lock (this.turnLock) {
+			foreach (CancellationTokenSource cts in this.handoffTimers.Values) {
+				cts.Cancel();
+				cts.Dispose();
+			}
+			this.handoffTimers.Clear();
+		}
+
+		this.gate.Dispose();
+	}
 
 	/// <summary>Marks the start of a conversation turn for an agent. Pair with <see cref="EndTurnAsync"/>.</summary>
 	public void BeginTurn(long agentId) {
-		lock (this.turnLock) this.activeTurns[agentId] = this.activeTurns.GetValueOrDefault(agentId) + 1;
+		lock (this.turnLock) {
+			this.activeTurns[agentId] = this.activeTurns.GetValueOrDefault(agentId) + 1;
+
+			if (this.handoffTimers.Remove(agentId, out CancellationTokenSource? cts)) {
+				cts.Cancel();
+				cts.Dispose();
+			}
+		}
+
+		if (this.sessions.TryGetValue(agentId, out AgentBrowserSession? session) && session.HandedOff) {
+			session.HandedOff = false;
+			LogHandoffReclaimed(logger, agentId, session.InstanceId);
+		}
 	}
 
 	/// <summary>
@@ -104,12 +132,64 @@ public sealed partial class PinchtabInstanceManager(
 	public AgentBrowserSession? GetSession(long agentId) =>
 		this.sessions.TryGetValue(agentId, out AgentBrowserSession? session) ? session : null;
 
+	/// <summary>
+	/// Flags the agent's headed session to survive turn end so the user can drive the browser.
+	/// Returns the tool-facing result message (success or instructive error).
+	/// </summary>
+	public string MarkHandoff(long agentId) {
+		if (!this.sessions.TryGetValue(agentId, out AgentBrowserSession? session))
+			return "No browser session. Use browser-navigate with headed=true first.";
+		if (!session.Headed) return "Current browser session is headless. Re-open the page with headed=true first.";
+
+		session.HandedOff = true;
+		LogHandoffMarked(logger, agentId, session.InstanceId);
+		return "Browser handed off — finish your reply telling the user what to do.";
+	}
+
+	private void ArmHandoffTimer(long agentId) {
+		CancellationTokenSource cts = new();
+		lock (this.turnLock) {
+			if (this.handoffTimers.Remove(agentId, out CancellationTokenSource? old)) {
+				old.Cancel();
+				old.Dispose();
+			}
+			this.handoffTimers[agentId] = cts;
+		}
+
+		_ = this.ExpireHandoffAsync(agentId, cts.Token);
+	}
+
+	private async Task ExpireHandoffAsync(long agentId, CancellationToken ct) {
+		try {
+			await Task.Delay(this.HandoffTimeout, ct);
+		} catch (OperationCanceledException) {
+			return;
+		}
+
+		lock (this.turnLock) {
+			// A turn started concurrently with the expiry; BeginTurn owns the timer now
+			if (this.activeTurns.GetValueOrDefault(agentId) > 0) return;
+			if (this.handoffTimers.Remove(agentId, out CancellationTokenSource? cts)) cts.Dispose();
+		}
+
+		if (this.sessions.TryGetValue(agentId, out AgentBrowserSession? session)) session.HandedOff = false;
+		LogHandoffExpired(logger, agentId);
+		await this.CloseForAgentAsync(agentId);
+	}
+
 	[Trace("PinchtabInstanceManager > CloseForAgentAsync")]
 	public async Task CloseForAgentAsync(long agentId) {
 		await this.gate.WaitAsync();
 		try {
 			// A new turn may have started while we waited for the gate; keep the instance alive
 			lock (this.turnLock) { if (this.activeTurns.GetValueOrDefault(agentId) > 0) return; }
+
+			// A handed-off session survives turn end; the user is driving the browser
+			if (this.sessions.TryGetValue(agentId, out AgentBrowserSession? pending) && pending.HandedOff) {
+				this.ArmHandoffTimer(agentId);
+				LogHandoffPersisted(logger, agentId, pending.InstanceId);
+				return;
+			}
 
 			if (!this.sessions.TryRemove(agentId, out AgentBrowserSession? session)) return;
 
@@ -186,4 +266,16 @@ public sealed partial class PinchtabInstanceManager(
 
 	[LoggerMessage(Level = LogLevel.Warning, Message = "Failed to close pinchtab instance {InstanceId} for agent {AgentId}")]
 	private static partial void LogCloseFailed(ILogger logger, Exception ex, long agentId, string instanceId);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Browser handoff marked for agent {AgentId} (instance {InstanceId})")]
+	private static partial void LogHandoffMarked(ILogger logger, long agentId, string instanceId);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Handed-off instance {InstanceId} for agent {AgentId} persists past turn end")]
+	private static partial void LogHandoffPersisted(ILogger logger, long agentId, string instanceId);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Agent {AgentId} reclaimed handed-off instance {InstanceId}")]
+	private static partial void LogHandoffReclaimed(ILogger logger, long agentId, string instanceId);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Browser handoff for agent {AgentId} timed out; closing instance")]
+	private static partial void LogHandoffExpired(ILogger logger, long agentId);
 }

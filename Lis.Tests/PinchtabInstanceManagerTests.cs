@@ -60,7 +60,7 @@ public class PinchtabInstanceManagerTests {
 	}
 
 	private static PinchtabInstanceManager CreateManager(FakePinchtabClient client) =>
-		new(client, NullLogger<PinchtabInstanceManager>.Instance);
+		new(client, new PinchtabOptions(), NullLogger<PinchtabInstanceManager>.Instance);
 
 	[Fact]
 	public async Task Creates_profile_and_starts_instance_on_first_call() {
@@ -207,5 +207,97 @@ public class PinchtabInstanceManagerTests {
 		await manager.EndTurnAsync(42);
 
 		Assert.Empty(client.StoppedInstances);
+	}
+
+	[Fact]
+	public async Task Handoff_skips_close_at_turn_end() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(7);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(7, headed: true, CancellationToken.None);
+		string result = manager.MarkHandoff(7);
+		await manager.EndTurnAsync(7);
+
+		Assert.Contains("handed off", result);
+		Assert.Empty(client.StoppedInstances);
+		Assert.NotNull(manager.GetSession(7));
+		Assert.Equal(session.InstanceId, manager.GetSession(7)!.InstanceId);
+	}
+
+	[Fact]
+	public async Task BeginTurn_reclaims_handoff_and_next_turn_end_closes() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(7);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(7, headed: true, CancellationToken.None);
+		manager.MarkHandoff(7);
+		await manager.EndTurnAsync(7);
+
+		manager.BeginTurn(7);
+		Assert.False(manager.GetSession(7)!.HandedOff);
+		await manager.EndTurnAsync(7);
+
+		Assert.Contains(session.InstanceId, client.StoppedInstances);
+		Assert.Null(manager.GetSession(7));
+	}
+
+	[Fact]
+	public async Task Handoff_timeout_closes_instance() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+		manager.HandoffTimeout = TimeSpan.FromMilliseconds(50);
+
+		manager.BeginTurn(7);
+		AgentBrowserSession session = await manager.EnsureSessionAsync(7, headed: true, CancellationToken.None);
+		manager.MarkHandoff(7);
+		await manager.EndTurnAsync(7);
+		Assert.Empty(client.StoppedInstances);
+
+		for (int i = 0; i < 40 && client.StoppedInstances.Count == 0; i++) await Task.Delay(50);
+
+		Assert.Contains(session.InstanceId, client.StoppedInstances);
+		Assert.Null(manager.GetSession(7));
+	}
+
+	[Fact]
+	public async Task MarkHandoff_rejects_headless_session() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(7);
+		await manager.EnsureSessionAsync(7, headed: false, CancellationToken.None);
+		string result = manager.MarkHandoff(7);
+		await manager.EndTurnAsync(7);
+
+		Assert.Contains("headless", result);
+		Assert.NotEmpty(client.StoppedInstances);
+	}
+
+	[Fact]
+	public void MarkHandoff_without_session_returns_error() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		string result = manager.MarkHandoff(7);
+
+		Assert.Contains("No browser session", result);
+	}
+
+	[Fact]
+	public async Task Double_handoff_is_idempotent() {
+		FakePinchtabClient client = new();
+		PinchtabInstanceManager manager = CreateManager(client);
+
+		manager.BeginTurn(7);
+		await manager.EnsureSessionAsync(7, headed: true, CancellationToken.None);
+		manager.MarkHandoff(7);
+		string second = manager.MarkHandoff(7);
+		await manager.EndTurnAsync(7);
+
+		Assert.Contains("handed off", second);
+		Assert.Empty(client.StoppedInstances);
+		Assert.NotNull(manager.GetSession(7));
 	}
 }

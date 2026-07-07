@@ -197,6 +197,7 @@ public sealed class A2aClientTests : IDisposable {
 
 		PinchtabInstanceManager pinchtabInstances = new(
 			new FakeNullPinchtabClient(),
+			new PinchtabOptions(),
 			NullLogger<PinchtabInstanceManager>.Instance);
 
 		return new A2aClient(
