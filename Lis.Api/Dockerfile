@@ -26,31 +26,27 @@ COPY Lis.Providers/ Lis.Providers/
 COPY Lis.Api/ Lis.Api/
 RUN dotnet publish "Lis.Api/Lis.Api.csproj" -c Release --no-restore -o /app
 
-# Download Playwright's bundled Chromium (SDK has pwsh)
-RUN pwsh /app/playwright.ps1 install chromium
-
 # Runtime Image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 EXPOSE 3010
 WORKDIR /app
 
-# Globalization, timezones, and Chromium shared library dependencies
+# Globalization, timezones, and Chromium for pinchtab browser automation
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     LC_ALL=pt_BR.UTF-8 \
     LANG=pt_BR.UTF-8
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    locales tzdata bash \
-    libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
-    libcups2t64 libdrm2 libdbus-1-3 libxkbcommon0 libatspi2.0-0t64 \
-    libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
-    libgbm1 libpango-1.0-0 libcairo2 libasound2t64 libxshmfence1 \
-    fonts-liberation \
+    locales tzdata bash chromium fonts-liberation \
     && sed -i '/pt_BR.UTF-8/s/^# //g' /etc/locale.gen \
     && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Playwright browsers from build stage
-COPY --from=build /root/.cache/ms-playwright /root/.cache/ms-playwright
+# PinchTab binary (pinned) — skips runtime download
+ARG TARGETARCH
+ADD --chmod=755 https://github.com/pinchtab/pinchtab/releases/download/v0.14.0/pinchtab-linux-${TARGETARCH} /opt/pinchtab/bin/pinchtab
+RUN printf 'v0.14.0' > /opt/pinchtab/bin/VERSION
+ENV PINCHTAB_DATA_DIR=/opt/pinchtab \
+    PINCHTAB_CHROME_PATH=/usr/bin/chromium
 
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "Lis.Api.dll"]
