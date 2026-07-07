@@ -73,7 +73,8 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		CancellationToken ct = default) {
 		try {
 			(_, string tabId) = await this.GetTabOrThrowAsync();
-			await client.ActionAsync(tabId, new { kind = "click", @ref }, ct);
+			// waitNav: clicks often navigate; without it pinchtab's guard rejects the action with 409 navigation_changed
+			await client.ActionAsync(tabId, new { kind = "click", @ref, waitNav = true }, ct);
 			return $"Clicked {@ref}. Page may have changed — use browser-snapshot to see the result.";
 		} catch (InvalidOperationException ex) {
 			return ex.Message;
@@ -113,7 +114,8 @@ public sealed class BrowserPlugin(PinchtabInstanceManager instances, IPinchtabCl
 		CancellationToken ct = default) {
 		try {
 			(_, string tabId) = await this.GetTabOrThrowAsync();
-			object payload = @ref is null ? new { kind = "press", key } : new { kind = "press", key, @ref };
+			// waitNav: Enter on a form navigates; without it pinchtab's guard rejects the action with 409 navigation_changed
+			object payload = @ref is null ? new { kind = "press", key, waitNav = true } : new { kind = "press", key, @ref, waitNav = true };
 			await client.ActionAsync(tabId, payload, ct);
 			return $"Pressed {key}.";
 		} catch (InvalidOperationException ex) {

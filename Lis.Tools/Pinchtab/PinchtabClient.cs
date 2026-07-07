@@ -57,7 +57,7 @@ public sealed class PinchtabClient(
 	public async Task<PinchtabProfile?> FindProfileAsync(string name, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync("/profiles", ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		List<PinchtabProfile>? profiles = await response.Content.ReadFromJsonAsync<List<PinchtabProfile>>(Json, ct);
 		return profiles?.FirstOrDefault(p => p.Name == name);
@@ -67,7 +67,7 @@ public sealed class PinchtabClient(
 	public async Task<PinchtabProfile> CreateProfileAsync(string name, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync("/profiles", new { name }, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadFromJsonAsync<PinchtabProfile>(Json, ct)
 			?? throw new InvalidOperationException("Empty response creating pinchtab profile.");
@@ -77,7 +77,7 @@ public sealed class PinchtabClient(
 	public async Task StopProfileAsync(string profileId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync($"/profiles/{profileId}/stop", content: null, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 	}
 
 	[Trace("PinchtabClient > StartInstanceAsync")]
@@ -90,7 +90,7 @@ public sealed class PinchtabClient(
 
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync("/instances/start", body, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadFromJsonAsync<PinchtabInstance>(Json, ct)
 			?? throw new InvalidOperationException("Empty response starting pinchtab instance.");
@@ -109,14 +109,14 @@ public sealed class PinchtabClient(
 	public async Task StopInstanceAsync(string instanceId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync($"/instances/{instanceId}/stop", content: null, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 	}
 
 	[Trace("PinchtabClient > OpenTabAsync")]
 	public async Task<PinchtabTab> OpenTabAsync(string instanceId, string url, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/instances/{instanceId}/tabs/open", new { url }, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadFromJsonAsync<PinchtabTab>(Json, ct)
 			?? throw new InvalidOperationException("Empty response opening pinchtab tab.");
@@ -126,7 +126,7 @@ public sealed class PinchtabClient(
 	public async Task<string> ListTabsAsync(string instanceId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync($"/instances/{instanceId}/tabs", ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsStringAsync(ct);
 	}
@@ -135,7 +135,7 @@ public sealed class PinchtabClient(
 	public async Task<string> NavigateAsync(string tabId, string url, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/navigate", new { url }, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsStringAsync(ct);
 	}
@@ -145,7 +145,7 @@ public sealed class PinchtabClient(
 		using HttpClient client = this.CreateClient();
 		string query = $"/tabs/{tabId}/snapshot?filter={Uri.EscapeDataString(filter)}&format=compact&maxTokens={maxTokens}";
 		using HttpResponseMessage response = await client.GetAsync(query, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsStringAsync(ct);
 	}
@@ -154,7 +154,7 @@ public sealed class PinchtabClient(
 	public async Task<string> ActionAsync(string tabId, object payload, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/action", payload, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsStringAsync(ct);
 	}
@@ -163,7 +163,7 @@ public sealed class PinchtabClient(
 	public async Task<string> EvaluateAsync(string tabId, string expression, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsJsonAsync($"/tabs/{tabId}/evaluate", new { expression }, Json, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsStringAsync(ct);
 	}
@@ -172,7 +172,7 @@ public sealed class PinchtabClient(
 	public async Task<byte[]> ScreenshotAsync(string tabId, CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.GetAsync($"/tabs/{tabId}/screenshot?format=png&raw=true", ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
 
 		return await response.Content.ReadAsByteArrayAsync(ct);
 	}
@@ -181,7 +181,17 @@ public sealed class PinchtabClient(
 	public async Task ShutdownAsync(CancellationToken ct = default) {
 		using HttpClient client = this.CreateClient();
 		using HttpResponseMessage response = await client.PostAsync("/shutdown", content: null, ct);
-		response.EnsureSuccessStatusCode();
+		await EnsureSuccessAsync(response, ct);
+	}
+
+	/// <summary>Like EnsureSuccessStatusCode, but includes the response body so pinchtab error codes (e.g. navigation_changed) surface.</summary>
+	private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct) {
+		if (response.IsSuccessStatusCode) return;
+
+		string body = await response.Content.ReadAsStringAsync(ct);
+		throw new HttpRequestException(
+			$"Pinchtab returned {(int)response.StatusCode} ({response.StatusCode}): {body}",
+			inner: null, response.StatusCode);
 	}
 
 	private HttpClient CreateClient() {

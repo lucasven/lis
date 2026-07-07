@@ -67,6 +67,13 @@ public sealed partial class PinchtabInstanceManager(
 
 			string profileId = await this.EnsureProfileAsync(agentId, ct);
 
+			if (headed) {
+				string? display    = Environment.GetEnvironmentVariable("DISPLAY");
+				string? wayland    = Environment.GetEnvironmentVariable("WAYLAND_DISPLAY");
+				string? xauthority = Environment.GetEnvironmentVariable("XAUTHORITY");
+				LogHeadedDisplay(logger, display, wayland, xauthority);
+			}
+
 			// A profile can only have one active instance; stop any stale one (ignore errors)
 			try { await client.StopProfileAsync(profileId, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { }
 
@@ -129,6 +136,9 @@ public sealed partial class PinchtabInstanceManager(
 				throw new InvalidOperationException($"Pinchtab instance {instance.Id} failed to start.");
 		}
 	}
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Starting headed instance with DISPLAY={Display}, WAYLAND_DISPLAY={WaylandDisplay}, XAUTHORITY={Xauthority}")]
+	private static partial void LogHeadedDisplay(ILogger logger, string? display, string? waylandDisplay, string? xauthority);
 
 	[LoggerMessage(Level = LogLevel.Information, Message = "Started pinchtab instance {InstanceId} for agent {AgentId} (headed: {Headed})")]
 	private static partial void LogStarted(ILogger logger, long agentId, string instanceId, bool headed);

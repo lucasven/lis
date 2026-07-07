@@ -102,6 +102,11 @@ public sealed partial class PinchtabProcessManager(
 
 		this.process = proc;
 		LogServerStarted(logger, proc.Id, options.BinaryPath);
+		// Chrome inherits the sidecar's environment; without DISPLAY here, headed windows can't reach the screen
+		string? display    = Environment.GetEnvironmentVariable("DISPLAY");
+		string? wayland    = Environment.GetEnvironmentVariable("WAYLAND_DISPLAY");
+		string? xauthority = Environment.GetEnvironmentVariable("XAUTHORITY");
+		LogServerDisplayEnv(logger, display, wayland, xauthority);
 		return exitedTcs.Task;
 	}
 
@@ -193,9 +198,12 @@ public sealed partial class PinchtabProcessManager(
 	[LoggerMessage(Level = LogLevel.Information, Message = "Wrote pinchtab config to {Path}")]
 	private static partial void LogConfigWritten(ILogger logger, string path);
 
-	[LoggerMessage(Level = LogLevel.Debug, Message = "[pinchtab] {Line}")]
+	[LoggerMessage(Level = LogLevel.Information, Message = "Pinchtab sidecar environment: DISPLAY={Display}, WAYLAND_DISPLAY={WaylandDisplay}, XAUTHORITY={Xauthority}")]
+	private static partial void LogServerDisplayEnv(ILogger logger, string? display, string? waylandDisplay, string? xauthority);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "[pinchtab] {Line}")]
 	private static partial void LogServerStdout(ILogger logger, string line);
 
-	[LoggerMessage(Level = LogLevel.Debug, Message = "[pinchtab!] {Line}")]
+	[LoggerMessage(Level = LogLevel.Information, Message = "[pinchtab!] {Line}")]
 	private static partial void LogServerStderr(ILogger logger, string line);
 }
