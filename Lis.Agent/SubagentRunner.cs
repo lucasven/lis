@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 using Lis.Core.Channel;
 using Lis.Core.Configuration;
 using Lis.Core.Subagents;
@@ -69,7 +71,8 @@ public sealed class SubagentRunner(
 				Error  = $"Provider '{provider}' is not configured"
 			};
 
-		IUsageExtractor usageExtractor = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(provider);
+		IUsageExtractor      usageExtractor     = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(provider);
+		IReasoningExtractor? reasoningExtractor = serviceProvider.GetKeyedService<IReasoningExtractor>(provider);
 		IChatCompletionService chatService = chatClient.AsChatCompletionService();
 
 		string systemPrompt = await promptComposer.BuildAsync(db, agent.Id, ct);
@@ -87,17 +90,19 @@ public sealed class SubagentRunner(
 
 		ModelSettings modelSettings = AgentService.ToModelSettings(agent);
 
-		Dictionary<string, object> extensionData = new() { ["max_tokens"] = modelSettings.MaxTokens };
-		if (modelSettings.ThinkingEffort is { Length: > 0 } effort)
-			extensionData["thinking"] = new Dictionary<string, object> {
-				["type"]          = "enabled",
-				["budget_tokens"] = effort switch {
-					"low"    => 1024,
-					"medium" => 4096,
-					"high"   => 16384,
-					_        => int.TryParse(effort, out int t) ? t : 4096
-				}
-			};
+		int maxTokens = modelSettings.MaxTokens;
+
+		// Scope thinking config to the subagent's own model/effort. This also overrides
+		// any value inherited from the parent conversation's async flow, whose max_tokens
+		// bump doesn't apply here.
+		JsonObject? thinkingFields = null;
+		if (modelSettings.ThinkingEffort is { Length: > 0 } effort) {
+			(thinkingFields, int minMaxTokens) = ConversationService.BuildThinkingFields(modelId, effort, logger);
+			if (minMaxTokens > maxTokens) maxTokens = minMaxTokens;
+		}
+		ThinkingContext.Pending.Value = thinkingFields;
+
+		Dictionary<string, object> extensionData = new() { ["max_tokens"] = maxTokens };
 
 		PromptExecutionSettings settings = new() {
 			ModelId                = modelId,
@@ -129,7 +134,7 @@ public sealed class SubagentRunner(
 		int         totalOutput          = 0;
 
 		try {
-			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, history, agentKernel, settings, usageExtractor, ct)) {
+			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, history, agentKernel, settings, usageExtractor, reasoningExtractor, ct)) {
 				TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
 
 				if (msg.Role == AuthorRole.Assistant) {

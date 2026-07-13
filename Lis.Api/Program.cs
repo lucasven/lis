@@ -129,6 +129,8 @@ if (Env("ANTHROPIC_ENABLED") == "true") {
 		(sp, _) => sp.GetRequiredService<IUsageExtractor>());
 	builder.Services.AddKeyedSingleton<ITokenCounter>("anthropic",
 		(sp, _) => sp.GetRequiredService<ITokenCounter>());
+	builder.Services.AddKeyedSingleton<IReasoningExtractor>("anthropic",
+		(sp, _) => sp.GetRequiredService<IReasoningExtractor>());
 }
 
 if (Env("CODEX_ENABLED") == "true") builder.Services.AddCodex();

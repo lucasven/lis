@@ -38,6 +38,9 @@ public static class AnthropicProvider {
 		if (opts.CacheEnabled)
 			innerHandler = new CacheControlHandler(opts.CacheTtl) { InnerHandler = innerHandler };
 
+		// Injects per-request thinking config from ThinkingContext.Pending into the body
+		innerHandler = new ThinkingInjectionHandler { InnerHandler = innerHandler };
+
 		// OAuth: inject required system prompt prefix + URL rewrite
 		if (useBearer)
 			innerHandler = new OAuthSystemPromptHandler { InnerHandler = innerHandler };
@@ -53,6 +56,7 @@ public static class AnthropicProvider {
 		});
 		services.AddSingleton<IChatClient>(anthropic.Messages);
 		services.AddSingleton<IUsageExtractor, AnthropicUsageExtractor>();
+		services.AddSingleton<IReasoningExtractor, AnthropicReasoningExtractor>();
 
 		// Token counter (free endpoint for accurate post-compaction counts)
 		HttpClient tokenHttp = useBearer
@@ -162,6 +166,34 @@ public static class AnthropicProvider {
 			}
 
 			return obj.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+		}
+	}
+
+	/// <summary>
+	/// Injects per-request thinking fields (set on <see cref="ThinkingContext.Pending"/>) into
+	/// the Messages API request body. The SK→M.E.AI bridge does NOT forward thinking via
+	/// <c>PromptExecutionSettings.ExtensionData</c> or <c>ChatOptions.AdditionalProperties</c>,
+	/// so this is the cleanest provider-agnostic path.
+	/// </summary>
+	private sealed class ThinkingInjectionHandler : DelegatingHandler {
+		protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) {
+			if (request.Content is null || request.RequestUri?.AbsolutePath.Contains("/messages") != true)
+				return await base.SendAsync(request, ct);
+
+			JsonObject? pending = ThinkingContext.Pending.Value;
+			if (pending is null) return await base.SendAsync(request, ct);
+
+			string    json = await request.Content.ReadAsStringAsync(ct);
+			JsonNode? root = JsonNode.Parse(json);
+			if (root is JsonObject obj) {
+				foreach ((string key, JsonNode? value) in pending)
+					if (obj[key] is null)
+						obj[key] = value?.DeepClone();
+				string modified = obj.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+				request.Content = new StringContent(modified, Encoding.UTF8, "application/json");
+			}
+
+			return await base.SendAsync(request, ct);
 		}
 	}
 
