@@ -66,6 +66,8 @@ authorized = {owner (LIS_OWNER_JID)} ∪ {chat's allowed senders}
 | `/model` | Show current model | OwnerOnly |
 | `/model <name>` | Change model | OwnerOnly |
 | `/models` | List known models | Open |
+| `/think` | Show thinking effort | OwnerOnly |
+| `/think <level>` | Set thinking effort (low/medium/high/xhigh/max, token budget, or off) | OwnerOnly |
 | `/approve <id>` | Approve exec request | OwnerOnly |
 | `/deny <id>` | Deny exec request | OwnerOnly |
 
