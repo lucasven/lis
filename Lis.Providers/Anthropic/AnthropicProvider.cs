@@ -173,9 +173,9 @@ public static class AnthropicProvider {
 	/// Injects per-request thinking fields (set on <see cref="ThinkingContext.Pending"/>) into
 	/// the Messages API request body. The SK→M.E.AI bridge does NOT forward thinking via
 	/// <c>PromptExecutionSettings.ExtensionData</c> or <c>ChatOptions.AdditionalProperties</c>,
-	/// so this is the cleanest provider-agnostic path.
+	/// so this is the cleanest provider-agnostic path. Internal for wire-level tests.
 	/// </summary>
-	private sealed class ThinkingInjectionHandler : DelegatingHandler {
+	internal sealed class ThinkingInjectionHandler : DelegatingHandler {
 		protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) {
 			if (request.Content is null || request.RequestUri?.AbsolutePath.Contains("/messages") != true)
 				return await base.SendAsync(request, ct);
