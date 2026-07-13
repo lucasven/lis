@@ -92,8 +92,12 @@ public sealed class OpikTracer(OpikClient client, string project, ILogger<OpikTr
 	public void EndLlmSpan(ChatMessageContent msg, TokenUsage? usage) {
 		if (this._currentLlmSpan is null) return;
 
+		string? thinking = ToolRunner.GetThinking(msg);
+
 		this._currentLlmSpan.EndTime = Now();
-		this._currentLlmSpan.Output  = new { message = msg.Content };
+		this._currentLlmSpan.Output  = thinking is not null
+			? new { message = msg.Content, thinking }
+			: new { message = msg.Content };
 
 		if (usage is not null) {
 			this._currentLlmSpan.Usage = new OpikUsage {

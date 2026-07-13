@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using Lis.Agent.Commands;
@@ -144,13 +145,15 @@ public sealed partial class ConversationService(
 		IChannelClient channel            = channelProvider.Get(message.Channel);
 
 		// Resolve provider-specific services by agent.Provider key
-		IChatClient      chatClient;
-		IUsageExtractor  usageExtractor;
-		ITokenCounter?   tokenCounter;
+		IChatClient          chatClient;
+		IUsageExtractor      usageExtractor;
+		ITokenCounter?       tokenCounter;
+		IReasoningExtractor? reasoningExtractor;
 		try {
-			chatClient     = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
-			usageExtractor = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
-			tokenCounter   = serviceProvider.GetKeyedService<ITokenCounter>(agent.Provider);
+			chatClient         = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
+			usageExtractor     = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
+			tokenCounter       = serviceProvider.GetKeyedService<ITokenCounter>(agent.Provider);
+			reasoningExtractor = serviceProvider.GetKeyedService<IReasoningExtractor>(agent.Provider);
 		} catch (InvalidOperationException ex) {
 			string errorKey = $"provider_not_configured:{agent.Provider}";
 			if (errorSuppression.ShouldNotify(agent.Id, errorKey)) {
@@ -258,17 +261,20 @@ public sealed partial class ConversationService(
 
 		IChatCompletionService chatService = chatClient.AsChatCompletionService();
 
-		Dictionary<string, object> extensionData = new() { ["max_tokens"] = agentModelSettings.MaxTokens };
-		if (agentModelSettings.ThinkingEffort is { Length: > 0 } effort)
-			extensionData["thinking"] = new Dictionary<string, object> {
-				["type"] = "enabled",
-				["budget_tokens"] = effort switch {
-					"low"    => 1024,
-					"medium" => 4096,
-					"high"   => 16384,
-					_ => int.TryParse(effort, out int t) ? t : 4096
-				}
-			};
+		int maxTokens = agentModelSettings.MaxTokens;
+
+		// SK→M.E.AI does not forward ExtensionData["thinking"] to the wire — flow it via
+		// AsyncLocal so the provider's HTTP handler can inject it into the request body.
+		JsonObject? thinkingFields = null;
+		if (agentModelSettings.ThinkingEffort is { Length: > 0 } effort) {
+			(thinkingFields, int minMaxTokens) = BuildThinkingFields(agentModelSettings.Model, effort, logger);
+			// Anthropic requires max_tokens > thinking.budget_tokens; for adaptive
+			// xhigh/max, the docs additionally require max_tokens ≥ 64000.
+			if (minMaxTokens > maxTokens) maxTokens = minMaxTokens;
+		}
+		ThinkingContext.Pending.Value = thinkingFields;
+
+		Dictionary<string, object> extensionData = new() { ["max_tokens"] = maxTokens };
 
 		// Clone kernel and strip plugins not in the agent's tool policy.
 		// FunctionChoiceBehavior.Auto(functions:) breaks Anthropic SDK serialization,
@@ -295,7 +301,7 @@ public sealed partial class ConversationService(
 		pinchtabInstances.BeginTurn(agent.Id);
 		try {
 			opikTracer?.StartLlmSpan(agentModelSettings.Model, agent.Provider, chatHistory);
-			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, ct)) {
+			await foreach (ChatMessageContent msg in toolRunner.RunAsync(chatService, chatHistory, agentKernel, settings, usageExtractor, reasoningExtractor, ct)) {
 				string? externalId = null;
 				if (msg.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(msg.Content)) {
 					(string? content, bool shouldQuote) = ResponseDirectives.Parse(msg.Content);
@@ -368,6 +374,11 @@ public sealed partial class ConversationService(
 			if (opikTracer is not null) await opikTracer.EndTraceAsync(null, lastUsage);
 			throw;
 		} finally {
+			// Don't let thinking config leak into follow-up calls in this async flow
+			// (compaction, digests) — they set their own max_tokens and would violate
+			// the max_tokens > budget_tokens constraint.
+			ThinkingContext.Pending.Value = null;
+
 			// Close the agent's pinchtab browser instance at the end of the conversation turn
 			// (reference-counted: only closes when no other turn for this agent is running)
 			try { await pinchtabInstances.EndTurnAsync(agent.Id); }
@@ -678,6 +689,66 @@ public sealed partial class ConversationService(
 			return $"⚠️ Connection to provider '{agent.Provider}' was lost. Try again.";
 
 		return null;
+	}
+
+	// ── Extended thinking ───────────────────────────────────────────
+
+	/// <summary>
+	/// Builds the top-level request fields ("thinking", "output_config") injected into
+	/// the Anthropic request body via <see cref="ThinkingContext"/>, and reports the
+	/// minimum <c>max_tokens</c> the API requires alongside them. Claude 4.6+ models use
+	/// adaptive thinking (budget_tokens is deprecated on 4.6 and rejected on 4.7+);
+	/// older models use a fixed budget. Returns <c>(null, 0)</c> when thinking should
+	/// be disabled (e.g. xhigh on a model without adaptive support).
+	/// </summary>
+	internal static (JsonObject? Fields, int MinMaxTokens) BuildThinkingFields(string model, string effort, ILogger logger) {
+		string e = effort.ToLowerInvariant();
+
+		if (ModelSupportsAdaptive(model)) {
+			string adaptiveEffort = e is "low" or "medium" or "high" or "xhigh" or "max" ? e : "high";
+			JsonObject fields = new() {
+				// "summarized" is required to see thinking text on Opus 4.7+ (default is omitted)
+				["thinking"]      = new JsonObject { ["type"] = "adaptive", ["display"] = "summarized" },
+				["output_config"] = new JsonObject { ["effort"] = adaptiveEffort }
+			};
+			int minMaxTokens = adaptiveEffort is "xhigh" or "max" ? 64000 : 0;
+			return (fields, minMaxTokens);
+		}
+
+		// xhigh only exists as an adaptive effort level — disable rather than send an invalid budget
+		if (e == "xhigh") {
+			logger.LogWarning("xhigh effort requested on model '{Model}' which does not support adaptive thinking — disabling thinking", model);
+			return (null, 0);
+		}
+
+		int budget = e switch {
+			"low"    => 1024,
+			"medium" => 4096,
+			"high"   => 16000,
+			"max"    => ModelMaxBudget(model),
+			_        => int.TryParse(effort, out int t) ? t : 4096
+		};
+		JsonObject budgetFields = new() {
+			["thinking"] = new JsonObject { ["type"] = "enabled", ["budget_tokens"] = budget }
+		};
+		// API constraint: max_tokens MUST be > budget_tokens. Leave headroom for the
+		// non-thinking response: budget + 4096 keeps the visible answer ≥ 4096 tokens.
+		return (budgetFields, budget + 4096);
+	}
+
+	private static bool ModelSupportsAdaptive(string model) {
+		string m = model.ToLowerInvariant();
+		return m.Contains("opus-4-6") || m.Contains("opus-4-7") || m.Contains("opus-4-8")
+		    || m.Contains("sonnet-4-6") || m.Contains("fable") || m.Contains("mythos");
+	}
+
+	/// <summary>Fixed-budget ceiling for effort "max" — model-dependent, matches Claude Code's defaults.</summary>
+	private static int ModelMaxBudget(string model) {
+		string m = model.ToLowerInvariant();
+		if (m.Contains("opus"))   return 64000;
+		if (m.Contains("sonnet")) return 32000;
+		if (m.Contains("haiku"))  return 8192;
+		return 32000;
 	}
 
 	private static string Fmt(long tokens) =>

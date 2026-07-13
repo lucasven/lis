@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Lis.Core.A2A;
 using Lis.Core.Channel;
@@ -69,7 +70,8 @@ public sealed partial class A2aClient(
 
 			IChatClient chatClient = serviceProvider.GetRequiredKeyedService<IChatClient>(agent.Provider);
 			IChatCompletionService chatService = chatClient.AsChatCompletionService();
-			IUsageExtractor usageExtractor = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
+			IUsageExtractor      usageExtractor     = serviceProvider.GetRequiredKeyedService<IUsageExtractor>(agent.Provider);
+			IReasoningExtractor? reasoningExtractor = serviceProvider.GetKeyedService<IReasoningExtractor>(agent.Provider);
 
 			ChatHistory history = [];
 			if (!string.IsNullOrWhiteSpace(systemPrompt))
@@ -78,17 +80,18 @@ public sealed partial class A2aClient(
 
 			ModelSettings modelSettings = AgentService.ToModelSettings(agent);
 
-			Dictionary<string, object> extensionData = new() { ["max_tokens"] = modelSettings.MaxTokens };
-			if (modelSettings.ThinkingEffort is { Length: > 0 } effort)
-				extensionData["thinking"] = new Dictionary<string, object> {
-					["type"]          = "enabled",
-					["budget_tokens"] = effort switch {
-						"low"    => 1024,
-						"medium" => 4096,
-						"high"   => 16384,
-						_        => int.TryParse(effort, out int t) ? t : 4096
-					}
-				};
+			int maxTokens = modelSettings.MaxTokens;
+
+			// Scope thinking config to the target agent's model/effort (also overrides any
+			// value inherited from a calling conversation's async flow)
+			JsonObject? thinkingFields = null;
+			if (modelSettings.ThinkingEffort is { Length: > 0 } effort) {
+				(thinkingFields, int minMaxTokens) = ConversationService.BuildThinkingFields(modelSettings.Model, effort, logger);
+				if (minMaxTokens > maxTokens) maxTokens = minMaxTokens;
+			}
+			ThinkingContext.Pending.Value = thinkingFields;
+
+			Dictionary<string, object> extensionData = new() { ["max_tokens"] = maxTokens };
 
 			// Resolve lazily to break circular dependency (Kernel → A2aPlugin → A2aClient → Kernel)
 			Kernel            kernel            = serviceProvider.GetRequiredService<Kernel>();
@@ -134,7 +137,7 @@ public sealed partial class A2aClient(
 			pinchtabInstances.BeginTurn(agent.Id);
 			try {
 				await foreach (ChatMessageContent msg in toolRunner.RunAsync(
-					chatService, history, agentKernel, settings, usageExtractor, ct)) {
+					chatService, history, agentKernel, settings, usageExtractor, reasoningExtractor, ct)) {
 
 					TokenUsage? msgUsage = ToolRunner.GetUsage(msg);
 

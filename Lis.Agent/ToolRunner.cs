@@ -12,7 +12,8 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace Lis.Agent;
 
 public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService approvalService, ILogger<ToolRunner> logger) {
-	internal const string UsageMetadataKey = "LisTokenUsage";
+	internal const string UsageMetadataKey    = "LisTokenUsage";
+	internal const string ThinkingMetadataKey = "LisThinking";
 
 	private static int MaxIterations =>
 		int.TryParse(Environment.GetEnvironmentVariable("LIS_MAX_TOOL_ITERATIONS"), out int v) ? v : 10;
@@ -22,13 +23,14 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 		IChatCompletionService chat, ChatHistory history,
 		Kernel kernel, PromptExecutionSettings settings,
 		IUsageExtractor usageExtractor,
+		IReasoningExtractor? reasoningExtractor = null,
 		[EnumeratorCancellation] CancellationToken ct = default) {
 
 		for (int i = 0; i < MaxIterations; i++) {
 			int countBefore = history.Count;
 
 			(ChatMessageContent result, IReadOnlyList<FunctionCallContent> calls, TokenUsage? usage) =
-				await this.StreamResponseAsync(chat, history, settings, kernel, usageExtractor, ct);
+				await this.StreamResponseAsync(chat, history, settings, kernel, usageExtractor, reasoningExtractor, ct);
 
 			// SK's ChatClientChatCompletionService auto-appends a tool-call-only message
 			// to ChatHistory when FunctionChoiceBehavior is set (even with autoInvoke: false).
@@ -62,14 +64,26 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 		return null;
 	}
 
+	/// <summary>
+	/// Extracts the accumulated thinking text attached by <see cref="RunAsync"/> to an assistant message.
+	/// Returns null for messages without thinking content.
+	/// </summary>
+	public static string? GetThinking(ChatMessageContent message) {
+		if (message.Metadata?.TryGetValue(ThinkingMetadataKey, out object? value) == true)
+			return value as string;
+		return null;
+	}
+
 	[Trace("ToolRunner > StreamResponseAsync")]
 	private async Task<(ChatMessageContent, IReadOnlyList<FunctionCallContent>, TokenUsage?)> StreamResponseAsync(
 		IChatCompletionService chat, ChatHistory history,
 		PromptExecutionSettings settings, Kernel kernel,
-		IUsageExtractor usageExtractor, CancellationToken ct) {
+		IUsageExtractor usageExtractor, IReasoningExtractor? reasoningExtractor,
+		CancellationToken ct) {
 
 		AuthorRole?                role       = null;
 		StringBuilder              text       = new();
+		StringBuilder              thinking   = new();
 		FunctionCallContentBuilder fccBuilder = new();
 		bool                       typingSet  = false;
 		IReadOnlyDictionary<string, object?>? lastMetadata = null;
@@ -78,6 +92,18 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 			chat.GetStreamingChatMessageContentsAsync(history, settings, kernel, ct)) {
 
 			role ??= chunk.Role;
+
+			// The SK→M.E.AI bridge strips reasoning content from chunk.Items, but the
+			// raw provider event lives on chunk.InnerContent. The provider-specific
+			// IReasoningExtractor reads the delta from there. Thinking is kept out of
+			// the text output — it's separate content.
+			string? thinkingText = reasoningExtractor?.ExtractReasoningDelta(chunk.InnerContent);
+			if (thinkingText is not null) {
+				if (thinkingText.Length > 0) thinking.Append(thinkingText);
+				fccBuilder.Append(chunk);
+				if (chunk.Metadata is { Count: > 0 }) lastMetadata = chunk.Metadata;
+				continue;
+			}
 
 			if (!typingSet && chunk.Content is { Length: > 0 }
 			    && ToolContext.Channel is not null && ToolContext.ChatId is not null) {
@@ -105,10 +131,15 @@ public sealed class ToolRunner(ToolAuthRegistry authRegistry, IApprovalService a
 		}
 		Activity.Current?.SetTag("tool.calls_count", calls.Count);
 
-		// Build message with usage attached in metadata (thread-safe, per-message)
-		Dictionary<string, object?>? metadata = usage is not null
-			? new Dictionary<string, object?> { [UsageMetadataKey] = usage }
-			: null;
+		// Build message with usage + accumulated thinking attached in metadata
+		// (thread-safe, per-message). SkContent serialization persists the thinking
+		// to the database for free.
+		Dictionary<string, object?>? metadata = null;
+		if (usage is not null || thinking.Length > 0) {
+			metadata = new Dictionary<string, object?>();
+			if (usage is not null)   metadata[UsageMetadataKey]    = usage;
+			if (thinking.Length > 0) metadata[ThinkingMetadataKey] = thinking.ToString();
+		}
 
 		string? content = text.Length > 0 ? text.ToString() : null;
 		ChatMessageContent message = new(role: role ?? AuthorRole.Assistant, content: content, metadata: metadata);
