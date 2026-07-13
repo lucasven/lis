@@ -201,11 +201,18 @@ public class ThinkingLiveE2ETests {
 		(IChatCompletionService chatService, ToolRunner toolRunner, Kernel kernel,
 		 IUsageExtractor usageExtractor, IReasoningExtractor reasoningExtractor, string model) = BuildLiveStack();
 
-		SetThinking(model, "high", maxTokensFloor: 4096, out PromptExecutionSettings settings);
+		// Adaptive thinking is the model's choice — a trivial prompt may legitimately skip it.
+		// xhigh + a multi-step constraint puzzle makes thinking near-certain. Budget-mode
+		// models don't support xhigh (BuildThinkingFields disables), so fall back to high.
+		string effort = ConversationService.BuildThinkingFields(model, "xhigh", NullLogger<ConversationService>.Instance).Fields is not null
+			? "xhigh" : "high";
+		SetThinking(model, effort, maxTokensFloor: 4096, out PromptExecutionSettings settings);
 		settings.ModelId = model;
 
 		ChatHistory history = [];
-		history.AddUserMessage("Think through this carefully, then answer in one word: what is the capital of France?");
+		history.AddUserMessage(
+			"A farmer has chickens and rabbits. There are 35 heads and 94 legs in total. " +
+			"Work out step by step how many chickens and how many rabbits there are, then answer with just the two numbers.");
 
 		List<ChatMessageContent> messages = [];
 		await foreach (ChatMessageContent msg in toolRunner.RunAsync(
@@ -215,7 +222,8 @@ public class ThinkingLiveE2ETests {
 		ChatMessageContent assistant = Assert.Single(messages);
 		Assert.False(string.IsNullOrWhiteSpace(assistant.Content));
 		Assert.False(string.IsNullOrWhiteSpace(ToolRunner.GetThinking(assistant)),
-			"expected thinking deltas from the API — check thinking injection and the reasoning extractor");
+			"no thinking deltas arrived — either adaptive thinking skipped this prompt (retry), " +
+			"or thinking injection / the reasoning extractor is broken");
 		Assert.NotNull(ToolRunner.GetUsage(assistant));
 	}
 

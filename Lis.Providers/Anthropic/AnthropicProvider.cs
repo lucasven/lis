@@ -19,7 +19,7 @@ public static class AnthropicProvider {
 	public static IServiceCollection AddAnthropic(this IServiceCollection services) {
 		AnthropicOptions opts = new() {
 			ApiKey         = Env("ANTHROPIC_API_KEY"),
-			Model          = Env("ANTHROPIC_MODEL") is { Length: > 0 } m ? m : "claude-sonnet-4-20250514",
+			Model          = Env("ANTHROPIC_MODEL") is { Length: > 0 } m ? m : "claude-sonnet-4-6",
 			MaxTokens      = EnvInt("ANTHROPIC_MAX_TOKENS", 4096),
 			ContextBudget  = EnvInt("ANTHROPIC_CONTEXT_BUDGET", 12000),
 			ThinkingEffort = Env("ANTHROPIC_THINKING_EFFORT") is { Length: > 0 } te ? te : null,
