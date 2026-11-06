@@ -12,4 +12,5 @@ public sealed class CodexOptions {
 	public string          BaseUrl          { get; init; } = "https://chatgpt.com/backend-api";
 	public int             ExpiryBufferSeconds { get; init; } = 300;
 	public CodexTransport  Transport        { get; init; } = CodexTransport.Sse;
+	public string          ImageModel       { get; init; } = "gpt-image-1.5";
 }

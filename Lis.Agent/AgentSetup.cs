@@ -1,5 +1,6 @@
 using Lis.Agent.Commands;
 using Lis.Core.A2A;
+using Lis.Core.Channel;
 using Lis.Core.Subagents;
 using Lis.Tools;
 using Lis.Tools.Pinchtab;
@@ -43,6 +44,8 @@ public static class AgentSetup {
 			kernel.Plugins.AddFromType<SkillPlugin>(pluginName: "skill", serviceProvider: sp);
 			kernel.Plugins.AddFromType<SubagentPlugin>(pluginName: "sub", serviceProvider: sp);
 			kernel.Plugins.AddFromType<SendFilePlugin>(pluginName: "sendfile", serviceProvider: sp);
+			if (sp.GetService<IImageGenerationService>() is not null)
+				kernel.Plugins.AddFromType<ImagePlugin>(pluginName: "image", serviceProvider: sp);
 			kernel.Plugins.AddFromType<ToolsHelpPlugin>(pluginName: "help", serviceProvider: sp);
 
 			// Build auth registry from plugin metadata

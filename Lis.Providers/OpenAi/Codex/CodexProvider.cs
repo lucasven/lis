@@ -26,7 +26,8 @@ public static class CodexProvider {
 				"sse"       => CodexTransport.Sse,
 				"websocket" => CodexTransport.WebSocket,
 				_           => CodexTransport.Auto
-			}
+			},
+			ImageModel = Env("CODEX_IMAGE_MODEL") is { Length: > 0 } im ? im : "gpt-image-1.5"
 		};
 
 		HttpClient httpClient = new();
@@ -34,11 +35,15 @@ public static class CodexProvider {
 		CodexWebSocketTransport wsTransport = new(tokenManager, opts);
 		CodexChatClient chatClient = new(tokenManager, opts, httpClient, wsTransport);
 
+		// Image generation can take well over HttpClient's 100s default
+		CodexImageClient imageClient = new(tokenManager, opts, new HttpClient { Timeout = TimeSpan.FromMinutes(5) });
+
 		// Register as keyed services only — Anthropic remains the unkeyed default (INV-19)
 		services.AddKeyedSingleton<IChatClient>("codex", chatClient);
 		services.AddKeyedSingleton<IUsageExtractor>("codex", new CodexUsageExtractor());
 		services.AddKeyedSingleton<ITokenCounter>("codex", new CodexTokenCounter());
 		services.AddKeyedSingleton("codex", tokenManager);
+		services.AddSingleton<IImageGenerationService>(imageClient);
 		services.AddKeyedSingleton("codex", new ModelSettings {
 			Model = opts.Model, MaxTokens = opts.MaxTokens,
 			ContextBudget = opts.ContextBudget, ThinkingEffort = opts.ReasoningEffort

@@ -248,7 +248,7 @@ public sealed class CodexChatClient : IChatClient, ISessionAware {
 		};
 	}
 
-	private static Dictionary<string, string> BuildBaseHeaders(CodexTokenInfo token) => new() {
+	internal static Dictionary<string, string> BuildBaseHeaders(CodexTokenInfo token) => new() {
 		["Authorization"]       = $"Bearer {token.AccessToken}",
 		["chatgpt-account-id"]  = token.AccountId,
 		["originator"]          = "lis",

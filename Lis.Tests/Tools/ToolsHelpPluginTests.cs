@@ -17,6 +17,7 @@ public sealed class ToolsHelpPluginTests {
 		Assert.Contains("config", result);
 		Assert.Contains("filesystem", result);
 		Assert.Contains("prompt", result);
+		Assert.Contains("image", result);
 	}
 
 	[Fact]
@@ -37,6 +38,7 @@ public sealed class ToolsHelpPluginTests {
 	[InlineData("memory")]
 	[InlineData("web")]
 	[InlineData("prompt")]
+	[InlineData("image")]
 	public void Get_AllGroups_ReturnContent(string group) {
 		string result = ToolsHelpPlugin.Get(group);
 
